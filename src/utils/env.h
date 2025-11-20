@@ -1,0 +1,4 @@
+#include "error.h"
+#include "../data_structures/htab.h"
+
+ExitEnum populateEnvTable(HashTablePtr env_table, const char** environ);

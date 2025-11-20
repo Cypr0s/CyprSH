@@ -1,6 +1,7 @@
+#include "../utils/strings.h"
+#include "../utils/error.h"
 
 #define HASH_TABLE_SIZE 64 // enough for env
-#include "../util.h"
 
 typedef struct htabitem {
     char* key;

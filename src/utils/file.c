@@ -1,6 +1,6 @@
 #include "file.h"
 
-ExitEnum open_file(const char* path, __uint32_t flag, int32_t* file_descriptor) {
+ExitEnum open_file(const char* path, uint32_t flag, int32_t* file_descriptor) {
     *file_descriptor = open(path, flag);
     if(*file_descriptor == -1) {
         fprintf(stderr, "%s: %s\n", path, strerror(errno));
