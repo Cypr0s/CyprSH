@@ -11,6 +11,7 @@ uint8_t getHash(const char* key) {
     return (uint8_t)(hash & (HASH_TABLE_SIZE - 1));
 }
 
+
 void hashTableInit(HashTablePtr table) {
     for(uint8_t i = 0; i < HASH_TABLE_SIZE; i++) {
         (*table)[i] = NULL;
@@ -32,7 +33,7 @@ char* hashTableGetValue(HashTablePtr table, const char* key) {
 }
 
 
-ExitEnum hashTableInsert(HashTablePtr table, const char* key, const char* value) {
+void hashTableInsert(HashTablePtr table, const char* key, const char* value) {
     uint8_t hash = getHash(key);
     HTabItemPtr tmp = (*table)[hash];
 
@@ -41,29 +42,28 @@ ExitEnum hashTableInsert(HashTablePtr table, const char* key, const char* value)
             free(tmp->value);
             tmp->value = strdup(value);
             if(tmp->value == NULL) {
-                customPrint();
-                return EXIT_MALLOC_ERROR;
+                error = EXIT_MALLOC_ERROR;
             }
-            return EXIT_SUCCESS;
+            return;
         }
         tmp = tmp->next;
     }
 
     HTabItemPtr new_item = (HTabItemPtr) malloc(sizeof(HTabItem));
     if(new_item == NULL) {
-        customPrint();
-        return EXIT_MALLOC_ERROR;
+        error = EXIT_MALLOC_ERROR;
+        return;
     }
     new_item->key = strdup(key);
     if(new_item->key == NULL) {
-        customPrint();
-        return EXIT_MALLOC_ERROR;
+        error = EXIT_MALLOC_ERROR;
+        return;
     }
 
     new_item->value = strdup(value);
     if(new_item->value == NULL) {
-        customPrint();
-        return EXIT_MALLOC_ERROR;
+        error = EXIT_MALLOC_ERROR;
+        return;
     }
 
     new_item->next = (*table)[hash];

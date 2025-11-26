@@ -1,3 +1,6 @@
+#include <errno.h>
+
+extern ExitEnum error;
 
 typedef enum {
     EXIT_SUCCESS=0,
@@ -7,3 +10,7 @@ typedef enum {
     EXIT_COMM_CANNOT_EXEC=126,
     EXIT_COMMAND_NOT_FOUND=127,
 } ExitEnum;
+
+void print_errno(const char *path);
+
+void print_error(void);

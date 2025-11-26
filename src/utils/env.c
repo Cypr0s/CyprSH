@@ -1,7 +1,7 @@
 #include "env.h"
 
 
-ExitEnum populateEnvTable(HashTablePtr env_table,const char** environ) {
+void populateEnvTable(HashTablePtr env_table,const char** environ) {
     hashTableInit(env_table);
     while(*environ != NULL) {
         const char* value = *environ; 
@@ -20,20 +20,21 @@ ExitEnum populateEnvTable(HashTablePtr env_table,const char** environ) {
         char* key =(char*) malloc(key_length + 1);
         if(key == NULL) {
             hashTableDispose(env_table);
-            return EXIT_MALLOC_ERROR;
+            error = EXIT_MALLOC_ERROR;
+            return;
         }
 
         memcpy(key, *environ, key_length);
         key[key_length] = '\0';
 
-        if(hashTableInsert(env_table, key, value + 1)){
+        hashTableInsert(env_table, key, value + 1);
+        if(error){
             free(key);
             hashTableDispose(env_table);
-            return EXIT_MALLOC_ERROR;
+            return;
         }
 
         free(key);
         environ++;
     }
-    return EXIT_SUCCESS;
 }

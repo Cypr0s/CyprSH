@@ -1,21 +1,45 @@
 #include "shell.h"
 
+
+
 uint32_t main(uint32_t argc, char **argv, char** environ) {
     int32_t file_descriptor = 0; // default stdin
-    ExitEnum exit = EXIT_SUCCESS;
     if(argc == 2) {
-        exit = open_file(argv[1], O_RDONLY, &file_descriptor);
-        if(exit) return exit;
+        open_file(argv[1], O_RDONLY, &file_descriptor);
+
+        if(error) return error;
     }
 
     HashTable env_table; 
-    if(populateEnvTable(&env_table, environ)) {
-        return EXIT_MALLOC_ERROR;
+    populateEnvTable(&env_table, environ);
+    if(error) {
+        print_error(); // TODO create ERROR func
+        return error;
     }
+        
 
     run_shell(file_descriptor, &env_table);
+    if(error) {
+        print_error(); // TODO create ERROR func
+        return error;
+    }
 
     hashTableDispose(&env_table);
     close(file_descriptor);
-    return exit;
+    return error;
+}
+
+
+void run_shell(uint32_t file_descriptior, HashTablePtr env_table) {
+    // execute mode
+    if(!isatty(file_descriptior)) {
+        exec();
+        return;
+    }
+
+    // load history file or create it if it does not exist
+    create_file(HISTORY_FILE_PATH);
+    using_history();
+    read_history(HISTORY_FILE_PATH);
+
 }

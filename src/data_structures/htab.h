@@ -16,7 +16,7 @@ uint8_t getHash(const char* key);
 
 void hashTableInit(HashTablePtr table);
 
-ExitEnum hashTableInsert(HashTablePtr table, const char* key,const  char* value);
+void hashTableInsert(HashTablePtr table, const char* key,const  char* value);
 
 void hashTableRemove(HashTablePtr table, const char* key);
 
