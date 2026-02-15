@@ -1,15 +1,17 @@
 #include <errno.h>
 
-extern ExitEnum error;
 
-typedef enum {
-    EXIT_SUCCESS=0,
-    EXIT_ERROR=1,
-    EXIT_SHELL_MISUSE=2,
-    EXIT_MALLOC_ERROR=3,
-    EXIT_COMM_CANNOT_EXEC=126,
-    EXIT_COMMAND_NOT_FOUND=127,
-} ExitEnum;
+
+typedef enum return_values {
+    SUCCESS=0,
+    ERROR_DEFAULT=1,
+    ERROR_SHELL_MISUSE=2,
+    ERROR_MALLOC_FAILURE=3,
+    ERROR_INT_OVERFLOW=4,
+    ERROR_INDEX_OUT_OF_BOUNDS=5,
+    ERROR_COMM_CANNOT_EXEC=126,
+    ERROR_COMMAND_NOT_FOUND=127,
+} StatusEnum;
 
 void print_errno(const char *path);
 

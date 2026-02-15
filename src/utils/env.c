@@ -1,7 +1,7 @@
 #include "env.h"
 
 
-void populateEnvTable(HashTablePtr env_table,const char** environ) {
+void populateEnvTable(HashTablePtr env_table, const char** environ) {
     hashTableInit(env_table);
     while(*environ != NULL) {
         const char* value = *environ; 
