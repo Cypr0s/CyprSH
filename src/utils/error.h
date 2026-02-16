@@ -1,6 +1,10 @@
 #include <errno.h>
 
-
+#define ERR_CHECK(status) do { \
+    if((status) != SUCCESS) { \
+        return (status); \
+    } \
+}while(0)
 
 typedef enum return_values {
     SUCCESS=0,

@@ -161,9 +161,7 @@ StatusEnum hashTableInsert(HashTablePtr table, const char* key, const char* valu
 
     if((table->currentSize + 1) * LOAD_FACTOR_DENUM >= table->capacity * LOAD_FACTOR_NUM) {
         StatusEnum st = hashTableResize(table);
-        if(st != SUCCESS) {
-            return st;
-        }
+        ERR_CHECK(st);
     }
 
     int32_t index = hashTableFindIndex(table, key);
@@ -214,9 +212,7 @@ StatusEnum hashTableResize(HashTablePtr table) {
     uint32_t old_capacity = table->capacity;
 
     StatusEnum st = hashTableNextPrime(&(table->capacity));
-    if(st != SUCCESS) {
-        return st;
-    }
+    ERR_CHECK(st);
 
     HashTableItemPtr new_data = malloc(sizeof(HashTableItem) * table->capacity);
     if(new_data == NULL) {

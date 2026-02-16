@@ -1,40 +1,40 @@
+/**
+ * 
+ */
 #include "env.h"
 
 
-void populateEnvTable(HashTablePtr env_table, const char** environ) {
-    hashTableInit(env_table);
-    while(*environ != NULL) {
-        const char* value = *environ; 
-    
-        while(*value != '\0' && *value != '=') {
-            value++;
-        }
+/**
+ *  @brief
+ */
+StatusEnum populateEnvTable(HashTablePtr env_table, char** environ) {
+    if(env_table == NULL || environ == NULL) {
+        return ERROR_DEFAULT;
+    }
 
-        if((*value == '\0') || (*(value + 1)) == '\0') {
+    StatusEnum st = SUCCESS;
+    // create hashtable
+    st = hashTableCtor(env_table);
+    ERR_CHECK(st);
+    // loop through env variables
+    while(*environ != NULL) {
+        char* value = strchr(*environ, '=');
+
+        if(value == NULL || *value == '\0') {
             environ++;
             continue;
         }
+        // insert into hashmap
+        *value = '\0';
+        st = hashTableInsert(env_table, *environ, value + 1);
+        *value = '=';
 
-        uint32_t key_length = (uint32_t)( value - (*environ));
-
-        char* key =(char*) malloc(key_length + 1);
-        if(key == NULL) {
-            hashTableDispose(env_table);
-            error = EXIT_MALLOC_ERROR;
-            return;
+        if(st != SUCCESS){
+            hashTableDtor(env_table);
+            return st;
         }
 
-        memcpy(key, *environ, key_length);
-        key[key_length] = '\0';
-
-        hashTableInsert(env_table, key, value + 1);
-        if(error){
-            free(key);
-            hashTableDispose(env_table);
-            return;
-        }
-
-        free(key);
         environ++;
     }
+    return st;
 }
