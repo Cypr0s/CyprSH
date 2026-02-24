@@ -6,4 +6,4 @@
 
 #define HISTORY_FILE_PATH "./CyprSH_history"
 
-StatusEnum run_shell(uint32_t file_descriptior, HashTablePtr env_table);
+StatusEnum run_shell(int32_t file_descriptior, HashTablePtr env_table);
