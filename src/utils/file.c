@@ -1,6 +1,6 @@
 #include "file.h"
 
-void open_file(const char* path, uint32_t flag, int32_t* file_descriptor) {
+StatusEnum open_file(const char* path, uint32_t flag, int32_t* file_descriptor) {
     *file_descriptor = open(path, flag, 0644);
     if(*file_descriptor != -1) {
         return;

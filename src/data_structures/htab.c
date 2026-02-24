@@ -153,7 +153,6 @@ StatusEnum hashTableInsert(HashTablePtr table, const char* key, const char* valu
     if(table == NULL || table->data == NULL || key == NULL || value == NULL) {
         return ERROR_DEFAULT;
     }
-        
 
     /* if hashtable is overloaded ( higher load than 0.675) 
         increase size to closest higher prime number
@@ -171,28 +170,30 @@ StatusEnum hashTableInsert(HashTablePtr table, const char* key, const char* valu
 
     HashTableItemPtr item = &(table->data[index]);
 
-    char *newValue = strdup(value);
-    if (newValue == NULL)
-        return ERROR_MALLOC_FAILURE;
+    /* allocate block on heap, `+ 2` for two \0 characters, one for key one for value */
+    uint32_t key_length = strlen(key);
+    uint32_t value_length = strlen(value); 
+    char* block = (char*) malloc(key_length + value_length + 2);
 
-    // rewrite value if the key is already in hashtable
+    if (block == NULL)
+        return ERROR_MALLOC_FAILURE;
+    // copy key into allocated block
+    memcpy(block, key, key_length);
+    block[key_length] = '\0';
+    // copy value with '\0'
+    memcpy(block + key_length + 1, value, value_length + 1);
+    
     if(item->state == ITEM_STATE_FULL) {
-        free(item->value);
-        item->value = newValue;
-        return SUCCESS;
+        free(item->key);
+    }
+    else {
+        table->currentSize++;
     }
 
-    // key is stored as string not hashed int
-    item->key = strdup(key);
-    if (item->key == NULL) {
-        free(newValue);
-        return ERROR_MALLOC_FAILURE;
-    }
-
-    item->value = newValue;
+    // move pointers
+    item->key = block;
+    item->value = block + key_length + 1;
     item->state = ITEM_STATE_FULL;
-    table->currentSize++;
-
     return SUCCESS;
 } // hashTableInsert
 
@@ -235,6 +236,15 @@ StatusEnum hashTableResize(HashTablePtr table) {
     for(uint32_t i = 0; i < old_capacity; i++) {
         if(old_data[i].state == ITEM_STATE_FULL) {
             new_table_index = hashTableFindIndex(table, old_data[i].key);
+
+            // indexing error
+            if(new_table_index == -1) {
+                free(new_data);
+                table->data = old_data;
+                table->capacity = old_capacity;
+                return ERROR_INDEX_OUT_OF_BOUNDS;
+            }
+            // move pointers to correct positions
             table->data[new_table_index].state = ITEM_STATE_FULL;
             table->data[new_table_index].key = old_data[i].key;
             table->data[new_table_index].value = old_data[i].value;
@@ -319,12 +329,9 @@ StatusEnum hashTableRemove(HashTablePtr table, const char* key) {
     if(item->state == ITEM_STATE_DELETED || item->state == ITEM_STATE_EMPTY) {
         return SUCCESS;
     }
-    // free key and value
+    // free one block
     if(item->key != NULL) {
         free(item->key);
-    }
-    if(item->value != NULL) {
-        free(item->value);
     }
 
     item->key = NULL;
@@ -436,3 +443,32 @@ static uint8_t isPrime(uint32_t n) {
     }
     return 1U;
 } // isPrime
+
+
+/**
+ * @brief
+ * 
+ * @param
+ * @param
+ * @param
+ * @return
+ */
+StatusEnum hashTableGetValue(HashTablePtr table, char* key, char** value) {
+    if(key == NULL || table == NULL || table->data == NULL) {
+        return ERROR_DEFAULT;
+    }
+    //// find index
+    uint32_t index = hashTableFindIndex(table, key);
+    if(index == -1) {
+        return ERROR_INDEX_OUT_OF_BOUNDS;
+    }
+
+    
+    HashTableItemPtr item = &(table->data[index]);
+    if(item->state == ITEM_STATE_EMPTY || item->state == ITEM_STATE_DELETED) {
+        return ERROR_DEFAULT;
+    }
+    // returning the value
+    *value = item->value;
+    return SUCCESS;
+}
