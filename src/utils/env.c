@@ -18,18 +18,24 @@ StatusEnum populateEnvTable(HashTablePtr env_table, char** environ) {
     ERR_CHECK(st);
     // loop through env variables
     while(*environ != NULL) {
-        char* value = strchr(*environ, '=');
+        char* eq = strchr(*environ, '=');
 
-        if(value == NULL || *value == '\0') {
+        if(eq == NULL) {
             environ++;
             continue;
         }
-        // insert into hashmap
-        *value = '\0';
-        st = hashTableInsert(env_table, *environ, value + 1);
-        *value = '=';
 
-        if(st != SUCCESS){
+        size_t key_len = (size_t)(eq - *environ);
+        char* key = strndup(*environ, key_len);
+        if(key == NULL) {
+            hashTableDtor(env_table);
+            return ERROR_MALLOC_FAILURE;
+        }
+
+        st = hashTableInsert(env_table, key, eq + 1);
+        free(key);
+
+        if(st != SUCCESS) {
             hashTableDtor(env_table);
             return st;
         }

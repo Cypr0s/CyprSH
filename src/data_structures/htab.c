@@ -4,6 +4,44 @@
 
 #include "htab.h"
 
+/** @brief Hash function 1
+ *  @param key Pointer to the key string
+ *  @return Hash value
+ */
+static uint32_t hash1(const char *key);
+
+
+/** @brief Hash function 2
+ *  @param key Pointer to the key string
+ *  @return Hash value
+ */
+static uint32_t hash2(const char *key);
+
+/** @brief Finds the index of a key in the hash table
+ *  @param table Pointer to the hash table
+ *  @param key Pointer to the key string
+ *  @return Index of the key if found, -1 otherwise
+ */
+static int32_t hashTableFindIndex(HashTablePtr table, const char* key);
+
+/** @brief Finds the next prime number greater than or equal to the given number
+ *  @param num Pointer to the number
+ *  @return SUCCESS if a prime is found, ERROR otherwise
+ */
+static StatusEnum hashTableNextPrime(uint32_t* num);
+
+/** @brief Finds the closest higher prime number to the given number
+ *  @param num The number
+ *  @return The closest higher prime number
+ */
+static uint32_t closestHigherPrime(uint32_t num);
+
+/** @brief Checks if a number is prime
+ *  @param n The number to check
+ *  @return 1 if the number is prime, 0 otherwise
+ */
+static uint8_t isPrime(uint32_t n);
+
 // Load factor threshold constants used resizing when table is 11/16 full
 #define LOAD_FACTOR_NUM 11
 #define LOAD_FACTOR_DENUM 16
@@ -25,12 +63,7 @@ static const uint32_t hashtable_prime_capacities[] = {
 };
 
 
-/**
- * @brief   Computes a 32-bit FNV-1a hash of a string
- * @param s pointer to a string which will be hashed
- * @return  32bit hashed value from input string
- */
-uint32_t hash1(const char *key) {
+static uint32_t hash1(const char *key) {
     uint32_t h = 2166136261U;
 
     while (*key) {
@@ -42,12 +75,8 @@ uint32_t hash1(const char *key) {
 } // hash1
 
 
-/**
- * @brief   Computes a 32-bit Jenkins-style hash of a string
- * @param s pointer to a string which will be hashed
- * @return  32bit hashed value from input string
- */
-uint32_t hash2(const char *key) {
+
+static uint32_t hash2(const char *key) {
     uint32_t h = 0;
 
     while (*key) {
@@ -64,16 +93,7 @@ uint32_t hash2(const char *key) {
 } // hash2
 
 
-/**
- * @brief       Initializes open adressing resizable hashtable
- *              
- *              Function inits a resizable open addressing hashtable,
- *              allocates array for items, sets all indexes to ITEM_STATE_OPEN
- *              and all pointers to NULL
- * 
- * @param table pointer to HashTable structure which is passed by address
- * @return      int enum 0 on success, 3 on malloc failure(not eough memory)   
- */
+
 StatusEnum hashTableCtor(HashTablePtr table) {
     if(table == NULL) {
         return ERROR_DEFAULT;
@@ -100,27 +120,18 @@ StatusEnum hashTableCtor(HashTablePtr table) {
 } // hashTableInit
 
 
-/**
- * @brief       Destructor which frees all allocated memory
- *
- *              Hash table destructor which frees all allocated memory
- *              associated with hashtable by looping through its data,
- *              table MUST be reinitialized after destrucion before reuse
- * 
- * @param table pointer to HashTable structure which is passed by address
- * @return      nothing
- */
+
 void hashTableDtor(HashTablePtr table) {
     if(table == NULL || table->data == NULL) {
         return;
     }
 
     // loop through whole hashtable and free occupied indexes
+    // key and value share one allocation (value points inside the key block)
     for(uint32_t i = 0; i < table->capacity; i++) {
         HashTableItemPtr item = &(table->data[i]);
         if(item->state == ITEM_STATE_FULL) {
             free(item->key);
-            free(item->value);
         } // if
     } // for
 
@@ -134,20 +145,7 @@ void hashTableDtor(HashTablePtr table) {
 } // HashTableDispose
 
 
-/**
- * @brief       Inserts a item into hashtable based on hashed key
- *      
- *              Function for inserting item into hashtable based on hashed value of "key".
- *              If item with same key is already in hashtable the value of item is replaced
- *              and old one is trashed, If function has allocation failure or hash indexing failure
- *              corresponding exit values are returned otherwise 0(SUCCESS) is returned
- * 
- * @param table Pointer to hashtabnle structure in which item will be inserted
- * @param key   String value based on which position in the hashtable is decided
- *              its stored as String but position is based on double hashing open addressing
- * @param value String value associated with the key which will be inserted
- * @return      Int error exit codes if errors happen or success(0)
- */
+
 StatusEnum hashTableInsert(HashTablePtr table, const char* key, const char* value) {
 
     if(table == NULL || table->data == NULL || key == NULL || value == NULL) {
@@ -198,17 +196,7 @@ StatusEnum hashTableInsert(HashTablePtr table, const char* key, const char* valu
 } // hashTableInsert
 
 
-/**
- * @brief       Resizes hash table to higher prime number and redistributes items
- *          
- *              FUnction increases the size of the hashtable to the next prime number
- *              while also re-inserting all FULL item indexes (DELETED and EMPTY indexes 
- *              are ignored)
- *              
- * 
- * @param table Pointer to hashtable which will be resized to next size
- * @return      error exit code 3 if allocation fails or 0 (SUCCESS)
- */
+
 StatusEnum hashTableResize(HashTablePtr table) {
     uint32_t old_capacity = table->capacity;
 
@@ -232,13 +220,13 @@ StatusEnum hashTableResize(HashTablePtr table) {
 
     // reenter all full indexes
 
-    uint32_t new_table_index;
+    int32_t new_table_index;
     for(uint32_t i = 0; i < old_capacity; i++) {
         if(old_data[i].state == ITEM_STATE_FULL) {
             new_table_index = hashTableFindIndex(table, old_data[i].key);
 
             // indexing error
-            if(new_table_index == -1) {
+            if(new_table_index < 0) {
                 free(new_data);
                 table->data = old_data;
                 table->capacity = old_capacity;
@@ -256,18 +244,7 @@ StatusEnum hashTableResize(HashTablePtr table) {
 } // hashTableResize
 
 
-/**
- * @brief       Finds corresponding index of key in hashmap
- *          
- *              Function that calculates corresponding index of key based on its two hashes,
- *              if position is FULL or DESTROYED it moves to next index until it finds a open one.
- *              If key is already in hashtable it returns the index where its located
- *
- * @param table Hash table in which the index will be searched for
- * @param key   String that corresponds to the index
- * @return      Int position(index) where key should be inserted or is located(insertion/deletion)
- *              -1 if index is not found
- */
+
 static int32_t hashTableFindIndex(HashTablePtr table, const char* key) {
     int32_t table_index;
 
@@ -301,17 +278,7 @@ static int32_t hashTableFindIndex(HashTablePtr table, const char* key) {
 } // hashTableFindIndex
 
 
-/**
- * @brief       Deletes an item from hashtable based on the input key
- * 
- *              Function that removes an item from hashtable (frees all allocated structures) 
- *              based on the hash of input key. If no index is found or the index is empty 
- *              function does nothing.
- * 
- * @param table hashmap which holds indexes
- * @param key   key based on which index will be deleted
- * @return      nothing
- */
+
 StatusEnum hashTableRemove(HashTablePtr table, const char* key) {
     if(table == NULL || key == NULL || table->data == NULL) {
         return ERROR_DEFAULT;
@@ -342,17 +309,7 @@ StatusEnum hashTableRemove(HashTablePtr table, const char* key) {
 } // hashTableRemove 
 
 
-/**
- *  @brief      Finds next higher prime of input num from hashtable_prime_capacities
- *
- *              Function thaht finds the next higher prime number from input number and 
- *              hashtable_prime_capacities, looking up next primes with binary search, 
- *              if the number needs to be higher or is already higher it looks one up by
- *              by looping       
- * 
- *  @param  num num based on which next size of hashtable will be decided
- *  @return     int default error 1 if passed a NULL, 3 if integer overflow happens
- */
+
 static StatusEnum hashTableNextPrime(uint32_t* num) {
     if(num == NULL) {
         return ERROR_DEFAULT;
@@ -445,21 +402,12 @@ static uint8_t isPrime(uint32_t n) {
 } // isPrime
 
 
-/**
- * @brief
- * 
- * @param
- * @param
- * @param
- * @return
- */
 StatusEnum hashTableGetValue(HashTablePtr table, char* key, char** value) {
     if(key == NULL || table == NULL || table->data == NULL) {
         return ERROR_DEFAULT;
     }
-    //// find index
-    uint32_t index = hashTableFindIndex(table, key);
-    if(index == -1) {
+    int32_t index = hashTableFindIndex(table, key);
+    if(index < 0) {
         return ERROR_INDEX_OUT_OF_BOUNDS;
     }
 
@@ -471,4 +419,4 @@ StatusEnum hashTableGetValue(HashTablePtr table, char* key, char** value) {
     // returning the value
     *value = item->value;
     return SUCCESS;
-}
+} // hashTableGetValue

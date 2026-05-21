@@ -2,35 +2,34 @@
 
 
 
-uint32_t main(uint32_t argc, char **argv, char** environ) {
-    int32_t file_descriptor = 0; // default stdin
+int32_t main(int32_t argc, char **argv, char** environ) {
+    int32_t file_descriptor = STDIN_FILENO;
     if(argc == 2) {
         open_file(argv[1], O_RDONLY, &file_descriptor);
-
-        
     }
 
-    HashTable env_table; 
+    HashTable env_table;
     populateEnvTable(&env_table, environ);
-        
 
     run_shell(file_descriptor, &env_table);
 
-    hashTableDispose(&env_table);
-    close(file_descriptor);
+    hashTableDtor(&env_table);
+    if(file_descriptor != STDIN_FILENO) {
+        close(file_descriptor);
+    }
     return 0;
 }
 
 
 StatusEnum run_shell(int32_t file_descriptor, HashTablePtr env_table) {
-    // non-execute mode
+    // interactive mode
     if(isatty(file_descriptor)) {
         create_file(HISTORY_FILE_PATH);
         using_history();
         read_history(HISTORY_FILE_PATH);
-        readline("cyprSH>");
+        char* line = readline("cyprSH> ");
+        free(line);
     }
-    fdopen();
 
-    // load history file or create it if it does not exist
+    return SUCCESS;
 }

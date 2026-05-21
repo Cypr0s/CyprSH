@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <string.h>
 
 #define ERR_CHECK(status) do { \
     if((status) != SUCCESS) { \
@@ -16,6 +17,8 @@ typedef enum return_values {
     ERROR_COMM_CANNOT_EXEC=126,
     ERROR_COMMAND_NOT_FOUND=127,
 } StatusEnum;
+
+extern StatusEnum error;
 
 void print_errno(const char *path);
 

@@ -26,20 +26,6 @@ typedef struct hashtable {
 
 
 /**
- * @brief   Computes a 32-bit FNV-1a hash of a string
- * @param s pointer to a string which will be hashed
- * @return  32bit hashed value from input string
- */
-uint32_t hash1(const char *key);
-
-/**
- * @brief   Computes a 32-bit Jenkins-style hash of a string
- * @param s pointer to a string which will be hashed
- * @return  32bit hashed value from input string
- */
-uint32_t hash2(const char *key);
-
-/**
  * @brief       Initializes open adressing resizable hashtable
  *              
  *              Function inits a resizable open addressing hashtable,
@@ -93,20 +79,6 @@ StatusEnum hashTableInsert(HashTablePtr table, const char* key, const char* valu
 StatusEnum hashTableResize(HashTablePtr table);
 
 /**
- * @brief       Finds corresponding index of key in hashmap
- *          
- *              Function that calculates corresponding index of key based on its two hashes,
- *              if position is FULL or DESTROYED it moves to next index until it finds a open one.
- *              If key is already in hashtable it returns the index where its located
- *
- * @param table Hash table in which the index will be searched for
- * @param key   String that corresponds to the index
- * @return      Int position(index) where key should be inserted or is located(insertion/deletion)
- *              -1 if index is not found
- */
-static int32_t hashTableFindIndex(HashTablePtr table, const char* key);
-
-/**
  * @brief       Deletes an item from hashtable based on the input key
  * 
  *              Function that removes an item from hashtable (frees all allocated structures) 
@@ -120,30 +92,9 @@ static int32_t hashTableFindIndex(HashTablePtr table, const char* key);
 StatusEnum hashTableRemove(HashTablePtr table, const char* key);
 
 /**
- *  @brief      Finds next higher prime of input num from hashtable_prime_capacities
- *
- *              Function thaht finds the next higher prime number from input number and 
- *              hashtable_prime_capacities, looking up next primes with binary search, 
- *              if the number needs to be higher or is already higher it looks one up by
- *              by looping       
+ * @brief       Gets value associated with the key from hashtable
  * 
- *  @param  num num based on which next size of hashtable will be decided
- *  @return     int default error 1 if passed a NULL, 3 if integer overflow happens
+ *             Function that gets the value associated with the key from hashtable, if key is not found
+ *              or index is empty or deleted corresponding error codes are returned otherwise 0(SUCCESS) is returned
  */
-static StatusEnum hashTableNextPrime(uint32_t* num);
-
-/**
- * @brief  Finds the smallest prime number greater than num
- *
- * @param  num  Starting value for the prime search
- * @return The closest prime number > num
- */
-static uint32_t closestHigherPrime(uint32_t num);
-
-/**
- * @brief  Tests whether a number is prime
- *
- * @param  n  Number to test
- * @return 1 if n is prime, 0 otherwise
- */
-static uint8_t isPrime(uint32_t n);
+StatusEnum hashTableGetValue(HashTablePtr table, char* key, char** value);
