@@ -106,6 +106,7 @@ StatusEnum hashTableCtor(HashTablePtr table) {
     table->currentSize = 0;
     table->data = (HashTableItemPtr) malloc(sizeof(HashTableItem) * table->capacity);
     if(table->data == NULL) {
+        fprintf(stderr, "hashTableCtor: malloc failure\n");
         return ERROR_MALLOC_FAILURE;
     }
 
@@ -149,6 +150,7 @@ void hashTableDtor(HashTablePtr table) {
 StatusEnum hashTableInsert(HashTablePtr table, const char* key, const char* value) {
 
     if(table == NULL || table->data == NULL || key == NULL || value == NULL) {
+        fprintf(stderr, "hashTableInsert: NULL pointer\n");
         return ERROR_DEFAULT;
     }
 
@@ -206,6 +208,7 @@ StatusEnum hashTableResize(HashTablePtr table) {
     HashTableItemPtr new_data = malloc(sizeof(HashTableItem) * table->capacity);
     if(new_data == NULL) {
         table->capacity = old_capacity;
+        fprintf(stderr, "hashTableResize: malloc failure\n");
         return ERROR_MALLOC_FAILURE;
     }
 
@@ -230,6 +233,7 @@ StatusEnum hashTableResize(HashTablePtr table) {
                 free(new_data);
                 table->data = old_data;
                 table->capacity = old_capacity;
+                fprintf(stderr, "hashTableResize: indexing failure\n");
                 return ERROR_INDEX_OUT_OF_BOUNDS;
             }
             // move pointers to correct positions
@@ -281,6 +285,7 @@ static int32_t hashTableFindIndex(HashTablePtr table, const char* key) {
 
 StatusEnum hashTableRemove(HashTablePtr table, const char* key) {
     if(table == NULL || key == NULL || table->data == NULL) {
+        fprintf(stderr, "hashTableRemove: NULL pointer\n");
         return ERROR_DEFAULT;
     }
 
@@ -312,6 +317,7 @@ StatusEnum hashTableRemove(HashTablePtr table, const char* key) {
 
 static StatusEnum hashTableNextPrime(uint32_t* num) {
     if(num == NULL) {
+        fprintf(stderr, "hashTableNextPrime: NULL pointer\n");
         return ERROR_DEFAULT;
     }
     uint32_t count = sizeof(hashtable_prime_capacities) / sizeof(hashtable_prime_capacities[0]);
@@ -322,6 +328,7 @@ static StatusEnum hashTableNextPrime(uint32_t* num) {
         (just some boundary not that it could actually happen with OS env) (its stupid i know) */ 
     if(*num >= hashtable_prime_capacities[count - 1]) {
         if(*num >= CLOSEST_UMAX32_PRIME) {
+            fprintf(stderr, "hashTableNextPrime: Size number too large for prime lookup\n");
             return ERROR_INT_OVERFLOW;
         }
 
@@ -356,6 +363,7 @@ static StatusEnum hashTableNextPrime(uint32_t* num) {
     }
 
     if (*num > UINT32_MAX / 2) {
+        fprintf(stderr, "hashTableNextPrime: Size number too large for prime lookup\n");
         return ERROR_INT_OVERFLOW;
     }
 
@@ -404,6 +412,7 @@ static uint8_t isPrime(uint32_t n) {
 
 StatusEnum hashTableGetValue(HashTablePtr table, char* key, char** value) {
     if(key == NULL || table == NULL || table->data == NULL) {
+        fprintf(stderr, "hashTableGetValue: NULL pointer\n");
         return ERROR_DEFAULT;
     }
     int32_t index = hashTableFindIndex(table, key);

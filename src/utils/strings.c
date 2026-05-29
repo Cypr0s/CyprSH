@@ -12,11 +12,12 @@ uint8_t streq(const char* str1, const char* str2) {
 
 
 char* strdup(const char* src) {
-    char* copy = (char*) malloc(strlen(src) + 1);
-    if (copy == NULL) {
+    size_t len = strlen(src);
+    char* copy = (char*) malloc(len + 1);
+    if(copy == NULL) {
         return NULL;
     }
-    memcpy(copy, src, strlen(src) + 1);
+    memcpy(copy, src, len + 1);
     return copy;
 }
 

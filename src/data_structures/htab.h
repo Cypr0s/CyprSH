@@ -1,5 +1,5 @@
 #include "../utils/strings.h"
-#include "../utils/error.h"
+#include "../error.h"
 
 //
 typedef enum {

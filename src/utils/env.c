@@ -9,6 +9,7 @@
  */
 StatusEnum populateEnvTable(HashTablePtr env_table, char** environ) {
     if(env_table == NULL || environ == NULL) {
+        fprintf(stderr, "populateEnvTable: NULL pointer\n");
         return ERROR_DEFAULT;
     }
 
@@ -28,6 +29,7 @@ StatusEnum populateEnvTable(HashTablePtr env_table, char** environ) {
         size_t key_len = (size_t)(eq - *environ);
         char* key = strndup(*environ, key_len);
         if(key == NULL) {
+            fprintf(stderr, "populateEnvTable: malloc failure\n");
             hashTableDtor(env_table);
             return ERROR_MALLOC_FAILURE;
         }
@@ -36,6 +38,7 @@ StatusEnum populateEnvTable(HashTablePtr env_table, char** environ) {
         free(key);
 
         if(st != SUCCESS) {
+            fprintf(stderr, "populateEnvTable: failed to insert env var (error %d)\n", st);
             hashTableDtor(env_table);
             return st;
         }

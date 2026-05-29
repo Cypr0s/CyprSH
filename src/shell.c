@@ -2,7 +2,8 @@
 
 
 
-int32_t main(int32_t argc, char **argv, char** environ) {
+int32_t main(int32_t argc, char **argv) {
+    extern char **environ;
     int32_t file_descriptor = STDIN_FILENO;
     if(argc == 2) {
         open_file(argv[1], O_RDONLY, &file_descriptor);

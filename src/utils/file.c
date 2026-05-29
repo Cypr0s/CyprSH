@@ -1,40 +1,38 @@
 #include "file.h"
 
-void open_file(const char* path, uint32_t flag, int32_t* file_descriptor) {
+StatusEnum open_file(const char* path, uint32_t flag, int32_t* file_descriptor) {
     *file_descriptor = open(path, flag, 0644);
     if(*file_descriptor != -1) {
-        return;
+        return SUCCESS;
     }
-    print_errno(path);
+    printErrno(path);
     if(errno == EACCES || errno == EISDIR) {
-        error = ERROR_COMM_CANNOT_EXEC;
+        return ERROR_COMM_CANNOT_EXEC;
     }
     else if(errno == ENOENT || errno == ENOTDIR) {
-        error = ERROR_COMMAND_NOT_FOUND;
+        return ERROR_COMMAND_NOT_FOUND;
     }
-    else {
-        error = ERROR_DEFAULT;
-    }
+    
+    return ERROR_DEFAULT;
 }
 
 
-void create_file(const char* path) {
+StatusEnum create_file(const char* path) {
     int32_t file_descriptor = open(path, O_CREAT | O_EXCL, 0644);
     if(file_descriptor >= 0) {
         close(file_descriptor);
-        return;
+        return SUCCESS;
     }
     if(errno == EEXIST) {
-        return;
+        return SUCCESS;
     }
-    print_errno(path);
+    printErrno(path);
     if(errno == EACCES || errno == EISDIR) {
-        error = ERROR_COMM_CANNOT_EXEC;
+        return ERROR_COMM_CANNOT_EXEC;
     }
     else if(errno == ENOTDIR || errno == ENOENT) {
-        error = ERROR_COMMAND_NOT_FOUND;
+        return ERROR_COMMAND_NOT_FOUND;
     }
-    else {
-        error = ERROR_DEFAULT;
-    }
+    
+    return ERROR_DEFAULT;
 }
