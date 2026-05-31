@@ -12,7 +12,7 @@ typedef struct {
 
 StatusEnum parserCtor(ParserPtr parser, LexerPtr lexer);
 
-void analyze(ParserPtr parser);
+StatusEnum analyze(ParserPtr parser);
 
 void parserDtor(ParserPtr parser);
 
