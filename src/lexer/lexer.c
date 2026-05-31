@@ -1,10 +1,9 @@
-#include "lexer.h"
+#include "lexer/lexer.h"
 
 // utils
 static int32_t getCharacter(LexerPtr lex);
 static Token createToken(TokenTypeEnum type, char* value);
 static Token errorToken(void);
-static Token nullToken(void);
 static uint8_t pushBuffer(LexerPtr lex,const char c);
 static int isWordDelimiter(int32_t c);
 
@@ -46,7 +45,7 @@ static Token errorToken(void) {
 }
 
 
-static Token nullToken(void) {
+Token nullToken(void) {
     return createToken(TOKEN_NULL, NULL);
 }
 
@@ -80,7 +79,7 @@ static Token handleStart(LexerPtr lex, int32_t c) {
         case EOF:
             return createToken(TOKEN_EOF, NULL);
         case '#':
-            stackPush(lex->token_stack, (int8_t)STATE_COMMENT);
+            stackPush(&lex->token_stack, (int8_t)STATE_COMMENT);
             return nullToken();
         case '\n':
             return createToken(TOKEN_NEWLINE, NULL);
@@ -146,13 +145,13 @@ static Token handleStart(LexerPtr lex, int32_t c) {
             // different word starts
         case '"': case '\'': case '\\':
             // word token starts
-            stackPush(lex->token_stack, (int8_t)STATE_WORD);
+            stackPush(&lex->token_stack, (int8_t)STATE_WORD);
             if(c == '\'') {
-                stackPush(lex->token_stack, (int8_t)STATE_SINGLE_QUOTE);
+                stackPush(&lex->token_stack, (int8_t)STATE_SINGLE_QUOTE);
             } else if(c == '"') {
-                stackPush(lex->token_stack, (int8_t)STATE_DOUBLE_QUOTE);
+                stackPush(&lex->token_stack, (int8_t)STATE_DOUBLE_QUOTE);
             } else if(c == '\\') {
-                stackPush(lex->token_stack, (int8_t)STATE_BACKSLASH);
+                stackPush(&lex->token_stack, (int8_t)STATE_BACKSLASH);
             } else {
                 if(!pushBuffer(lex, (char)c)) {
                     return errorToken();
@@ -161,7 +160,7 @@ static Token handleStart(LexerPtr lex, int32_t c) {
             return nullToken();
         default:
             // regular word tokens, all word delimiters are handled above
-            stackPush(lex->token_stack, (int8_t)STATE_WORD);
+            stackPush(&lex->token_stack, (int8_t)STATE_WORD);
             if (!pushBuffer(lex, (char)c)) {
                 return errorToken();
             }
@@ -173,7 +172,7 @@ static Token handleStart(LexerPtr lex, int32_t c) {
 static Token handleComment(LexerPtr lex, int32_t c) {
     // if its newlind ore end exit otherwise ignore
     if(c == '\n' || c == EOF) {
-        stackPop(lex->token_stack);
+        stackPop(&lex->token_stack);
         return c == EOF ? createToken(TOKEN_EOF, NULL) : createToken(TOKEN_NEWLINE, NULL);
     }
     return nullToken();
@@ -183,7 +182,7 @@ static Token handleComment(LexerPtr lex, int32_t c) {
 static Token handleWord(LexerPtr lex, int32_t c) {
     if(isWordDelimiter(c)) {
         lex->lookahead = c;
-        stackPop(lex->token_stack);  /* pop WORD */
+        stackPop(&lex->token_stack);  /* pop WORD */
         char* word = strdup(lex->buffer);
         if(word == NULL) {
             return errorToken();
@@ -201,11 +200,11 @@ static Token handleWord(LexerPtr lex, int32_t c) {
     }
 
     if(c == '\'') {
-        stackPush(lex->token_stack, (int8_t)STATE_SINGLE_QUOTE);
+        stackPush(&lex->token_stack, (int8_t)STATE_SINGLE_QUOTE);
     } else if(c == '"') {
-        stackPush(lex->token_stack, (int8_t)STATE_DOUBLE_QUOTE);
+        stackPush(&lex->token_stack, (int8_t)STATE_DOUBLE_QUOTE);
     } else if(c == '\\') {
-        stackPush(lex->token_stack, (int8_t)STATE_BACKSLASH);
+        stackPush(&lex->token_stack, (int8_t)STATE_BACKSLASH);
     } else {
         if (!pushBuffer(lex, (char)c)) {
              return errorToken();
@@ -223,7 +222,7 @@ static Token handleBackslash(LexerPtr lex, int32_t c) {
     // explicit '\n', line continuation
     if(c == '\n') {
         lex->line++;
-        stackPop(lex->token_stack);
+        stackPop(&lex->token_stack);
         return nullToken();
     }
     // push token
@@ -231,7 +230,7 @@ static Token handleBackslash(LexerPtr lex, int32_t c) {
         return errorToken();
     }
     // pop state
-    stackPop(lex->token_stack);
+    stackPop(&lex->token_stack);
     return nullToken();
 }
 
@@ -247,7 +246,7 @@ static Token handleSingleQuote(LexerPtr lex, int32_t c) {
             return errorToken();
         } 
     } else {
-        stackPop(lex->token_stack); // exit single quote
+        stackPop(&lex->token_stack); // exit single quote
     }
     return nullToken();
 }
@@ -259,9 +258,9 @@ static Token handleDoubleQuote(LexerPtr lex, int32_t c) {
         return errorToken();
     }
     if(c == '"') {
-        stackPop(lex->token_stack);
+        stackPop(&lex->token_stack);
     } else if(c == '\\') {
-        stackPush(lex->token_stack, (int8_t)STATE_DQ_BACKSLASH);
+        stackPush(&lex->token_stack, (int8_t)STATE_DQ_BACKSLASH);
     } else {
         if (!pushBuffer(lex, (char)c)) {
             return errorToken();
@@ -278,7 +277,7 @@ static Token handleDQBackslash(LexerPtr lex, int32_t c) {
     }
     if(c == '\n') {
         lex->line++;
-        stackPop(lex->token_stack);
+        stackPop(&lex->token_stack);
         return nullToken();
     }
     // escaped characters based on POSIX
@@ -290,41 +289,35 @@ static Token handleDQBackslash(LexerPtr lex, int32_t c) {
     if(!pushBuffer(lex, (char)c)) { 
         return errorToken();
     }
-    stackPop(lex->token_stack);
+    stackPop(&lex->token_stack);
     return nullToken();
 }
 
 
-StatusEnum lexerInit(LexerPtr lex, FILE* input) {
+StatusEnum lexerCtor(LexerPtr lex, FILE* input) {
     if(!lex) return ERROR_DEFAULT;
     lex->input = input;
     lex->line = 1;
     lex->lookahead = -1;
     lex->buffer_pos = 0;
-    lex->token_stack = malloc(sizeof(Stack));
-    if(lex->token_stack == NULL) {
-        fprintf(stderr, "lexerInit: malloc failure\n");
-        return ERROR_MALLOC_FAILURE;
+    if(stackInit(&lex->token_stack) != SUCCESS) { 
+        return ERROR_DEFAULT;
     }
-    if(lex->token_stack) {
-        if(stackInit(lex->token_stack) == SUCCESS) {
-            stackPush(lex->token_stack, (int8_t)STATE_START);
-        }
-    }
+    stackPush(&lex->token_stack, (int8_t)STATE_START);
     return SUCCESS;
 }
 
 
 void lexerDtor(LexerPtr lex) {
-    if(lex && lex->token_stack) {
-        free(lex->token_stack);
-        lex->token_stack = NULL;
+    if(lex == NULL) return;
+    if(lex->input != NULL && lex->input != stdin) {
+        fclose(lex->input);
     }
 }
 
 
 Token getToken(LexerPtr lex) {
-    if(!lex || !lex->token_stack) {
+    if(lex == NULL) {
         return errorToken();
     }
 
@@ -338,7 +331,7 @@ Token getToken(LexerPtr lex) {
         c = getCharacter(lex);
         
         // get top state
-        if(stackTop(lex->token_stack, &state_val) != SUCCESS) {
+        if(stackTop(&lex->token_stack, &state_val) != SUCCESS) {
             return errorToken();
         }
         FSMState state = (FSMState)state_val;
@@ -378,4 +371,29 @@ void tokenFree(TokenPtr tok) {
         free(tok->value);
         tok->value = NULL;
     }
+}
+
+void lexerReset(LexerPtr lex, FILE* input) {
+    if(lex == NULL) {
+        return;
+    }
+
+    if(lex->input != NULL && lex->input != stdin) {
+        fclose(lex->input);  // close old file before replacing
+    }
+
+    // reset buffer and line number
+    lex->buffer_pos = 0;
+    lex->buffer[0] = '\0';
+    lex->line = 1;
+    lex->lookahead = -1;
+
+    // reset state stack to initial state
+    while(!stackIsEmpty(&lex->token_stack)) {
+        stackPop(&lex->token_stack);
+    }
+    stackPush(&lex->token_stack, (int8_t)STATE_START);
+    
+    // reset input
+    lex->input = input;
 }

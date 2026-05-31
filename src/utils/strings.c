@@ -1,4 +1,4 @@
-#include "strings.h"
+#include "utils/strings.h"
 
 uint8_t streq(const char* str1, const char* str2) {
     while(*str1 && *str2) {

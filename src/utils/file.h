@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include "../error.h"
+#include "error.h"
 
 StatusEnum open_file(const char* path, uint32_t flag, int32_t* file_descriptor);
 

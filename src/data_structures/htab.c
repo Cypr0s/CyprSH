@@ -2,7 +2,7 @@
  * 
  */
 
-#include "htab.h"
+#include "data_structures/htab.h"
 
 /** @brief Hash function 1
  *  @param key Pointer to the key string

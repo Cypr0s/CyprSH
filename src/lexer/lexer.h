@@ -1,14 +1,14 @@
 #ifndef LEXER_H
 #define LEXER_H
 
-#include "../error.h"
+#include "error.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include "../data_structures/stack.h"
-#include "../utils/strings.h"
+#include "data_structures/stack.h"
+#include "utils/strings.h"
 
 #define MAX_TOKEN_LENGTH 1024
 
@@ -65,19 +65,23 @@ typedef struct {
 
 typedef struct {
     FILE* input;
-    StackPtr token_stack;       // stack for storing FSM states
+    Stack token_stack;       // stack for storing FSM states
     int32_t line;            // current line number 
     int32_t lookahead;       // one-char buffer (-1 = none)
     char buffer[MAX_TOKEN_LENGTH];
     int16_t buffer_pos;
 } Lexer, *LexerPtr;
 
-StatusEnum lexerInit(LexerPtr lex, FILE* input);
+StatusEnum lexerCtor(LexerPtr lex, FILE* input);
 
-void  lexerDtor(LexerPtr lex);
+void lexerDtor(LexerPtr lex);
 
 Token getToken(LexerPtr lex);
 
-void  tokenFree(TokenPtr tok);
+void tokenFree(TokenPtr tok);
+
+void lexerReset(LexerPtr lex);
+
+Token nullToken(void);
 
 #endif

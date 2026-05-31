@@ -1,6 +1,6 @@
-#include "./utils/file.h"
-#include "./data_structures/htab.h"
-#include "./utils/env.h"
+#include "utils/file.h"
+#include "data_structures/htab.h"
+#include "utils/env.h"
 #include <readline/readline.h>
 #include <readline/history.h>
 

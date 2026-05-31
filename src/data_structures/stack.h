@@ -2,7 +2,7 @@
 #define STACK_H
 
 #include <stdint.h>
-#include "../error.h"
+#include "error.h"
 
 #define STACK_CAPACITY 128
 
