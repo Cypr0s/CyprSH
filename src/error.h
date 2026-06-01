@@ -15,8 +15,9 @@ typedef enum return_values {
     ERROR_INDEX_OUT_OF_BOUNDS   = 5,
     ERROR_STACK_OVERFLOW        = 6,
     ERROR_STACK_UNDERFLOW       = 7,
-    ERROR_LEXER_ERROR           = 8,
+    ERROR_LEXICAL_ERROR         = 8,
     ERROR_LEXER_BUFFER_OVERFLOW = 9,
+    ERROR_SYNTAX_ERROR          = 10,
     ERROR_COMM_CANNOT_EXEC      = 126,
     ERROR_COMMAND_NOT_FOUND     = 127,
 } StatusEnum;

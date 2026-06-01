@@ -5,14 +5,13 @@
 
 typedef struct {
     LexerPtr lexer;
-    ASTNodePtr ast_root;
     Token current_token;
     Token peek_token;
 } Parser, *ParserPtr;
 
 StatusEnum parserCtor(ParserPtr parser, LexerPtr lexer);
 
-StatusEnum analyze(ParserPtr parser);
+StatusEnum analyze(ParserPtr parser, ASTNodePtr ast_root);
 
 void parserDtor(ParserPtr parser);
 

@@ -1,10 +1,10 @@
 #include "data_structures/ast.h"
 
 
-StatusEnum astNodeCtor(NodeTypeEnum type, char* value) {
+StatusEnum ASTNodeCtor(NodeTypeEnum type, char* value) {
     ASTNodePtr node = (ASTNodePtr) malloc(sizeof(ASTNode));
     if(node == NULL) {
-        fprintf(stderr, "CyprSH: astNodeCtor: malloc failure\n");
+        fprintf(stderr, "CyprSH: ASTNodeCtor: malloc failure\n");
         return ERROR_MALLOC_FAILURE;
     }
     node->type = type;
@@ -12,20 +12,20 @@ StatusEnum astNodeCtor(NodeTypeEnum type, char* value) {
     node->children = NULL;
     node->num_children = 0;
     return SUCCESS;
-} // astNodeCtor
+} // ASTNodeCtor
 
 
-void astNodeDtor(ASTNodePtr node) {
+void ASTNodeDtor(ASTNodePtr node) {
     if(node == NULL) {
         return;
     }
 
     free(node->value);
     free(node);
-} // astNodeDtor
+} // ASTNodeDtor
 
 
-StatusEnum addChild(ASTNodePtr parent, ASTNodePtr child) {
+StatusEnum ASTaddChild(ASTNodePtr parent, ASTNodePtr child) {
     if(parent == NULL || child == NULL) {
         fprintf(stderr, "CyprSH: adding NULL pointer child in syntax analysis\n");
         return ERROR_DEFAULT;
@@ -33,23 +33,23 @@ StatusEnum addChild(ASTNodePtr parent, ASTNodePtr child) {
 
     ASTNodePtr* new_children = realloc(parent->children, sizeof(ASTNodePtr) * (parent->num_children + 1));
     if(new_children == NULL) {
-        fprintf(stderr, "CyprSH: addChild: realloc failure\n");
+        fprintf(stderr, "CyprSH: AST tree realloc failure\n");
         return ERROR_MALLOC_FAILURE;
     }
     parent->children = new_children;
     parent->children[parent->num_children++] = child;
     child->parent = parent;
     return SUCCESS;
-} // addChild
+} // ASTaddChild
 
 
-void freeTree(ASTNodePtr node) {
+void ASTFreeTree(ASTNodePtr node) {
     if(node == NULL) {
         return;
     }
 
     for(int16_t i = 0; i < node->num_children; i++) {
-        freeTree(node->children[i]);
+        ASTFreeTree(node->children[i]);
     }
-    astNodeDtor(node);
-} // freeTree
+    ASTNodeDtor(node);
+} // ASTFreeTree
