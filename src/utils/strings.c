@@ -1,6 +1,7 @@
 #include "utils/strings.h"
 
 uint8_t streq(const char* str1, const char* str2) {
+    if(str1 == NULL || str2 == NULL) return 0U;
     while(*str1 && *str2) {
         if(*str1 != *str2) return 0U;
         str1++;

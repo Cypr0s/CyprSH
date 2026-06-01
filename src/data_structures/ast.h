@@ -9,7 +9,16 @@ typedef enum {
     NODE_COMPLETE_COMMAND,
     NODE_LIST,
     NODE_AND_OR,
+    NODE_PIPELINE,
+    NODE_SIMPLE_COMMAND,
+    NODE_CMD_PREFIX,
+    NODE_CMD_WORD,
+    NODE_CMD_SUFFIX,
+    NODE_REDIRECT,
 
+    NODE_ASSIGNMENT_WORD,
+    NODE_WORD,
+    NODE_IO_NUM,
 } NodeTypeEnum;
 
 typedef enum {
@@ -18,13 +27,29 @@ typedef enum {
     FLAG_BACKGROUND = 2,
     FLAG_OR = 4,
     FLAG_AND = 8,
-    
-} TokenTypeEnum;
+    FLAG_PIPE = 16,
+    FLAG_BANG = 32,
+} NodeFlagEnum;
+
+typedef enum {
+    REDIR_NONE      = 0,
+    REDIR_LESS      = 1,
+    REDIR_GREAT     = 2,
+    REDIR_DLESS     = 3,
+    REDIR_DGREAT    = 4,
+    REDIR_LESSAND   = 5,
+    REDIR_GREATAND  = 6,
+    REDIR_LESSGREAT = 7,
+    REDIR_CLOBBER   = 8,
+    REDIR_DLESSDASH = 9,
+    REDIR_TLESS     = 10,
+} RedirectTypeEnum;
+
 
 typedef struct ASTNode {
     NodeTypeEnum type;
     char* value;
-    int8_t flags;
+    int32_t flags;
     struct ASTNode* parent;
     struct ASTNode** children;
     int16_t num_children;

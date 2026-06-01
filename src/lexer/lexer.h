@@ -26,6 +26,8 @@ typedef enum {
     TOKEN_WORD,         // any unquoted/quoted word
     TOKEN_NEWLINE,      // \n
     TOKEN_IO_NUM,       // digits immediately before < or >
+    TOKEN_IO_LOCATION, // not supported, reserved for future use based on bash's IO_LOCATION token
+
     TOKEN_EOF,
 
     // control operators
