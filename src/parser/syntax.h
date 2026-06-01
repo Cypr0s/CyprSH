@@ -1,3 +1,6 @@
+#ifndef SYNTAX_H
+#define SYNTAX_H
+
 #include "lexer/lexer.h"
 #include "data_structures/ast.h"
 #include "error.h"
@@ -16,3 +19,5 @@ StatusEnum analyze(ParserPtr parser, ASTNodePtr ast_root);
 void parserDtor(ParserPtr parser);
 
 void parserReset(ParserPtr parser);
+
+#endif // SYNTAX_H

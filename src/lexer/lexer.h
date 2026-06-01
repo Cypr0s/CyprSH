@@ -80,7 +80,7 @@ Token getToken(LexerPtr lex);
 
 void tokenFree(TokenPtr tok);
 
-void lexerReset(LexerPtr lex);
+void lexerReset(LexerPtr lex, FILE* input);
 
 Token nullToken(void);
 

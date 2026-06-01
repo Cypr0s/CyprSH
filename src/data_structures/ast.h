@@ -1,3 +1,6 @@
+#ifndef AST_H
+#define AST_H
+
 #include <stdint.h>
 #include "error.h"
 
@@ -35,3 +38,5 @@ void ASTNodeDtor(ASTNodePtr node);
 StatusEnum ASTaddChild(ASTNodePtr parent, ASTNodePtr child);
 
 void ASTFreeTree(ASTNodePtr node);
+
+#endif // AST_H

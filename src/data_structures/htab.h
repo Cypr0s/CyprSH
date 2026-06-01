@@ -1,3 +1,6 @@
+#ifndef HTAB_H
+#define HTAB_H
+
 #include "utils/strings.h"
 #include "error.h"
 
@@ -98,3 +101,5 @@ StatusEnum hashTableRemove(HashTablePtr table, const char* key);
  *              or index is empty or deleted corresponding error codes are returned otherwise 0(SUCCESS) is returned
  */
 StatusEnum hashTableGetValue(HashTablePtr table, char* key, char** value);
+
+#endif // HTAB_H
