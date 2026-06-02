@@ -1,17 +1,18 @@
 #include "data_structures/ast.h"
 
 
-StatusEnum ASTNodeCtor(NodeTypeEnum type, char* value) {
+ASTNodePtr ASTNodeCtor(NodeTypeEnum type, char* value) {
     ASTNodePtr node = (ASTNodePtr) malloc(sizeof(ASTNode));
     if(node == NULL) {
         fprintf(stderr, "CyprSH: ASTNodeCtor: malloc failure\n");
-        return ERROR_MALLOC_FAILURE;
+        return NULL;
     }
     node->type = type;
-    node->value = strdup(value);
+    node->value = value ? strdup(value) : NULL;
     node->children = NULL;
     node->num_children = 0;
-    return SUCCESS;
+    node->flags = 0;
+    return node;
 } // ASTNodeCtor
 
 
@@ -51,5 +52,6 @@ void ASTFreeTree(ASTNodePtr node) {
     for(int16_t i = 0; i < node->num_children; i++) {
         ASTFreeTree(node->children[i]);
     }
+    free(node->children);
     ASTNodeDtor(node);
 } // ASTFreeTree

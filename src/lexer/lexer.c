@@ -184,6 +184,7 @@ static Token handleWord(LexerPtr lex, int32_t c) {
     if(isWordDelimiter(c)) {
         lex->lookahead = c;
         stackPop(&lex->token_stack);  /* pop WORD */
+        lex->buffer[lex->buffer_pos] = '\0';
         char* word = strdup(lex->buffer);
         if(word == NULL) {
             return errorToken();

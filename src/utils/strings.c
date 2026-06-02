@@ -21,7 +21,3 @@ char* strdup(const char* src) {
     memcpy(copy, src, len + 1);
     return copy;
 }
-
-char* read_line(FILE* input) {
-
-}

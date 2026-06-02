@@ -29,7 +29,7 @@ $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # debug
-debug: CFLAGS += -fsanitize=address,undefined -O0 -g -Werror 
+debug: CFLAGS += -DDEBUG -fsanitize=address,undefined -O0 -g -Werror 
 debug: LDFLAGS += -fsanitize=address,undefined
 debug: rebuild
 

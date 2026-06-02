@@ -23,14 +23,98 @@ int32_t main(int32_t argc, char **argv) {
 
 
 StatusEnum runShell(int32_t file_descriptor, HashTablePtr env_table) {
-    // interactive mode
+    (void) env_table;
     if(isatty(file_descriptor)) {
         create_file(HISTORY_FILE_PATH);
         using_history();
         read_history(HISTORY_FILE_PATH);
-        char* line = readline("cyprSH> ");
-        free(line);
+
+        while(1) {
+            char* line = readline("cyprSH> ");
+            if(!line) break;  // EOF (Ctrl+D)
+            if(*line == '\0') { free(line); continue; }
+
+            add_history(line);
+
+            FILE* input = fmemopen(line, strlen(line), "r");
+            if(!input) { free(line); continue; }
+
+            Lexer lexer;
+            lexerCtor(&lexer, input);
+
+            ASTNodePtr ast_root = ASTNodeCtor(NODE_PROGRAM, NULL);
+            if(!ast_root) { lexerDtor(&lexer); fclose(input); free(line); continue; }
+
+            Parser parser;
+            parserCtor(&parser, &lexer);
+            parserReset(&parser);
+
+            StatusEnum st = analyze(&parser, ast_root);
+            if(st == SUCCESS) {
+                #ifdef DEBUG
+                printAST(ast_root, 0);
+                #endif
+            }
+
+            parserDtor(&parser);
+            ASTFreeTree(ast_root);
+            lexerDtor(&lexer);
+            free(line);
+        }
+
+        write_history(HISTORY_FILE_PATH);
     }
 
     return SUCCESS;
+}
+
+
+
+void printAST(ASTNodePtr node, int depth) {
+    if(!node) return;
+
+    // indent
+    for(int i = 0; i < depth; i++) fprintf(stderr, "  ");
+
+    // node type name
+    const char* type_names[] = {
+        [NODE_PROGRAM]          = "PROGRAM",
+        [NODE_COMPLETE_COMMAND] = "COMPLETE_COMMAND",
+        [NODE_LIST]             = "LIST",
+        [NODE_AND_OR]           = "AND_OR",
+        [NODE_PIPELINE]         = "PIPELINE",
+        [NODE_SIMPLE_COMMAND]   = "SIMPLE_COMMAND",
+        [NODE_CMD_PREFIX]       = "CMD_PREFIX",
+        [NODE_CMD_WORD]         = "CMD_WORD",
+        [NODE_CMD_SUFFIX]       = "CMD_SUFFIX",
+        [NODE_REDIRECT]         = "REDIRECT",
+        [NODE_ASSIGNMENT_WORD]  = "ASSIGNMENT_WORD",
+        [NODE_WORD]             = "WORD",
+        [NODE_IO_NUM]           = "IO_NUM",
+        [NODE_SUBSHELL]         = "SUBSHELL",
+        [NODE_BRACE_GROUP]      = "BRACE_GROUP",
+        [NODE_IF_CLAUSE]        = "IF_CLAUSE",
+        [NODE_ELSE_CLAUSE]      = "ELSE_CLAUSE",
+        [NODE_WHILE_CLAUSE]     = "WHILE_CLAUSE",
+        [NODE_UNTIL_CLAUSE]     = "UNTIL_CLAUSE",
+        [NODE_FOR_CLAUSE]       = "FOR_CLAUSE",
+        [NODE_CASE_CLAUSE]      = "CASE_CLAUSE",
+        [NODE_CASE_ITEM]        = "CASE_ITEM",
+        [NODE_FUNCTION_DEF]     = "FUNCTION_DEF"
+    };
+
+    fprintf(stderr, "[%s]", type_names[node->type]);
+
+    // value if present
+    if(node->value) fprintf(stderr, " value='%s'", node->value);
+
+    // flags if set
+    if(node->flags) fprintf(stderr, " flags=%d", node->flags);
+
+    fprintf(stderr, "\n");
+
+    // recurse into children
+    for(int i = 0; i < node->num_children; i++) {
+        printAST(node->children[i], depth + 1);
+    }
 }

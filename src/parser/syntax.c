@@ -10,6 +10,7 @@ static void advanceTokens(ParserPtr parser);
 static ASTNodePtr createAndInsert(ASTNodePtr parent, NodeTypeEnum type, char* value);
 static uint8_t isRedirectOperator(TokenTypeEnum type);
 static int32_t tokenToRedirectType(TokenTypeEnum type);
+static uint8_t isAssignmentWord(const char* word);
 
 // recursive descent parsing functions
 static void analyzeLineBreak(ParserPtr parser);
@@ -95,20 +96,42 @@ static int32_t tokenToRedirectType(TokenTypeEnum type) {
     }
 }
 
-static uint8_t isCompoundListEnd(ParserPtr parser) {
-    if(parser->current_token.type == TOKEN_EOF)    return 1U;
-    if(parser->current_token.type == TOKEN_RPAREN) return 1U;
-    if(parser->current_token.type == TOKEN_RBRACE) return 1U;
-    if(parser->current_token.type != TOKEN_WORD)   return 0U;
-    if(parser->current_token.value == NULL)        return 0U;
+static uint8_t isCompoundListEnd(Token t) {
+    if(t.type == TOKEN_EOF)    return 1U;
+    if(t.type == TOKEN_RPAREN) return 1U;
+    if(t.type == TOKEN_RBRACE) return 1U;
+    if(t.type != TOKEN_WORD)   return 0U;
+    if(t.value == NULL)        return 0U;
 
     for(uint8_t i = 0; COMPOUND_END_KEYWORDS[i] != NULL; i++) {
-        if(streq(parser->current_token.value, COMPOUND_END_KEYWORDS[i])) {
+        if(streq(t.value, COMPOUND_END_KEYWORDS[i])) {
             return 1U;
         }
     }
     return 0U;
 }
+
+
+static uint8_t isAssignmentWord(const char* word) {
+    if(word == NULL || *word == '\0') return 0U;
+
+    // must start with letter or underscore
+    if(!isalpha((unsigned char)*word) && *word != '_') {
+        return 0U;
+    }
+
+    const char* p = word + 1;
+
+    while(*p && *p != '=') {
+        if(!isalnum((unsigned char)*p) && *p != '_') {
+            return 0U;
+        }
+        p++;
+    }
+
+    return *p == '=' ? 1U : 0U;
+}
+
 
 static void analyzeLineBreak(ParserPtr parser) {
     while(parser->current_token.type == TOKEN_NEWLINE) {
@@ -175,8 +198,7 @@ static StatusEnum analyzeCompleteCommand(ParserPtr parser, ASTNodePtr complete_c
         // get the list node (last child of complete_command)
         ASTNodePtr list = complete_command->children[complete_command->num_children - 1];
         // get last and_or in the list
-        ASTNodePtr last = list->children[list->num_children - 1];
-        last->flags |= FLAG_BACKGROUND;
+        list->flags |= FLAG_BACKGROUND;
         advanceTokens(parser);
     } else if(parser->current_token.type == TOKEN_SEMI) {
         advanceTokens(parser);
@@ -199,23 +221,24 @@ static StatusEnum analyzeList(ParserPtr parser, ASTNodePtr complete_command) {
         ASTFreeTree(list);
         return st;
     }
-
+    
 
     while(parser->current_token.type == TOKEN_SEMI || parser->current_token.type == TOKEN_BG) {
 
-        int8_t op = parser->current_token.type == TOKEN_SEMI ? FLAG_NONE : FLAG_BACKGROUND;
-        advanceTokens(parser);
 
-        if(parser->current_token.type == TOKEN_NEWLINE || parser->current_token.type == TOKEN_EOF) {
-            break;  // trailing separator, stop here
+        if(parser->peek_token.type == TOKEN_NEWLINE || parser->peek_token.type == TOKEN_EOF) {
+            break;  // don't consume — leave for analyzeCompleteCommand
         }
+
+        int8_t op = parser->current_token.type == TOKEN_SEMI ? FLAG_NONE : FLAG_BACKGROUND;
+        list->flags = op;
+        advanceTokens(parser);
 
         ASTNodePtr new_list = ASTNodeCtor(NODE_LIST, NULL);
         if(new_list == NULL) { 
             ASTFreeTree(list); 
             return ERROR_MALLOC_FAILURE; 
         }
-        new_list->flags = op;
 
         ASTaddChild(new_list, list);  // previous is lower in hierarchy
 
@@ -357,7 +380,7 @@ static StatusEnum analyzeSimpleCommand(ParserPtr parser, ASTNodePtr pipeline) {
     }
 
     // cmd prefix, !todo TOKEN_IO_LOCATION!
-    if((parser->current_token.type == TOKEN_WORD && isAssignemntWord(parser->current_token.value)) ||
+    if((parser->current_token.type == TOKEN_WORD && isAssignmentWord(parser->current_token.value)) ||
         parser->current_token.type == TOKEN_IO_NUM || 
         isRedirectOperator(parser->current_token.type)) {
         ASTNodePtr cmd_prefix = createAndInsert(command, NODE_CMD_PREFIX, NULL);
@@ -403,13 +426,13 @@ static StatusEnum analyzeSimpleCommand(ParserPtr parser, ASTNodePtr pipeline) {
 
 
 static StatusEnum analyzeCmdPrefix(ParserPtr parser, ASTNodePtr cmd_prefix) {
-    while((parser->current_token.type == TOKEN_WORD && isAssignemntWord(parser->current_token.value)) ||
+    while((parser->current_token.type == TOKEN_WORD && isAssignmentWord(parser->current_token.value)) ||
            parser->current_token.type == TOKEN_IO_NUM || 
            isRedirectOperator(parser->current_token.type)) 
     {
         // assignment word
         if(parser->current_token.type == TOKEN_WORD && 
-            isAssignemntWord(parser->current_token.value)) 
+            isAssignmentWord(parser->current_token.value)) 
         {
             ASTNodePtr assign = createAndInsert(cmd_prefix, NODE_ASSIGNMENT_WORD, parser->current_token.value);
     
@@ -526,8 +549,7 @@ static StatusEnum analyzeCompoundList(ParserPtr parser, ASTNodePtr parent) {
         advanceTokens(parser);  // just consume
     } else if(parser->current_token.type == TOKEN_BG) {
         ASTNodePtr list = parent->children[parent->num_children - 1];
-        ASTNodePtr last = list->children[list->num_children - 1];
-        last->flags |= FLAG_BACKGROUND;
+        list->flags |= FLAG_BACKGROUND;
         advanceTokens(parser);
     }
 
@@ -554,19 +576,19 @@ static StatusEnum analyzeTerm(ParserPtr parser, ASTNodePtr compound_node) {
         analyzeLineBreak(parser);
 
         // trailing separator — closing keyword instead of newline/EOF
-        if(isCompoundListEnd(parser)) {
+        if(isCompoundListEnd(parser->current_token)) {
             if(op == FLAG_BACKGROUND) {
                 term->flags |= FLAG_BACKGROUND;
             }
             break;
         }
+        term->flags = op;
 
         ASTNodePtr new_term = ASTNodeCtor(NODE_LIST, NULL);
         if(new_term == NULL) {
             ASTFreeTree(term);
             return ERROR_MALLOC_FAILURE;
         }
-        new_term->flags = op;
 
         ASTaddChild(new_term, term);
 
