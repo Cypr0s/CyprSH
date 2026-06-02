@@ -30,4 +30,4 @@ Work in progress. Currently implemented:
 - [ ] Job control
 
 ## License
-MIT
+GPL v3
