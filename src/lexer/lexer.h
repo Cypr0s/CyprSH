@@ -36,6 +36,7 @@ typedef enum {
     TOKEN_AND_IF,       // &&
     TOKEN_OR_IF,        // ||
     TOKEN_DOUBLE_SEMI,  // ;;
+    TOKEN_SEMI_AND,     // ;&
     TOKEN_CLOBBER,      // >|
     TOKEN_LBRACE,       // {
     TOKEN_RBRACE,       // }

@@ -93,6 +93,7 @@ static Token handleStart(LexerPtr lex, int32_t c) {
             // semicolon and double semicolon
             c2 = getCharacter(lex);
             if(c2 == ';') return createToken(TOKEN_DOUBLE_SEMI, NULL);
+            if(c2 == '&') return createToken(TOKEN_SEMI_AND, NULL);
             lex->lookahead = c2;
             return createToken(TOKEN_SEMI, NULL);
         case '|':

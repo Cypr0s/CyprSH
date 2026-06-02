@@ -12,7 +12,7 @@ int32_t main(int32_t argc, char **argv) {
     HashTable env_table;
     populateEnvTable(&env_table, environ);
 
-    run_shell(file_descriptor, &env_table);
+    runShell(file_descriptor, &env_table);
 
     hashTableDtor(&env_table);
     if(file_descriptor != STDIN_FILENO) {
@@ -22,7 +22,7 @@ int32_t main(int32_t argc, char **argv) {
 }
 
 
-StatusEnum run_shell(int32_t file_descriptor, HashTablePtr env_table) {
+StatusEnum runShell(int32_t file_descriptor, HashTablePtr env_table) {
     // interactive mode
     if(isatty(file_descriptor)) {
         create_file(HISTORY_FILE_PATH);

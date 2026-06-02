@@ -24,6 +24,12 @@ typedef enum {
     NODE_BRACE_GROUP,
     NODE_IF_CLAUSE,
     NODE_ELSE_CLAUSE,
+    NODE_WHILE_CLAUSE,
+    NODE_UNTIL_CLAUSE,
+    NODE_FOR_CLAUSE,
+    NODE_CASE_CLAUSE,
+    NODE_CASE_ITEM,
+    NODE_FUNCTION_DEF
 } NodeTypeEnum;
 
 typedef enum {
@@ -33,6 +39,8 @@ typedef enum {
     FLAG_AND = 4,
     FLAG_PIPE = 8,
     FLAG_BANG = 16,
+    FLAG_DOUBLE_SEMI = 32,
+    FLAG_SEMI_AND = 64,
 } NodeFlagEnum;
 
 typedef enum {
