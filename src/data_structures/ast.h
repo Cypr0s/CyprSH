@@ -19,16 +19,20 @@ typedef enum {
     NODE_ASSIGNMENT_WORD,
     NODE_WORD,
     NODE_IO_NUM,
+    
+    NODE_SUBSHELL,
+    NODE_BRACE_GROUP,
+    NODE_IF_CLAUSE,
+    NODE_ELSE_CLAUSE,
 } NodeTypeEnum;
 
 typedef enum {
     FLAG_NONE = 0,
-    FLAG_SEMICOLON = 1,
-    FLAG_BACKGROUND = 2,
-    FLAG_OR = 4,
-    FLAG_AND = 8,
-    FLAG_PIPE = 16,
-    FLAG_BANG = 32,
+    FLAG_BACKGROUND = 1,
+    FLAG_OR = 2,
+    FLAG_AND = 4,
+    FLAG_PIPE = 8,
+    FLAG_BANG = 16,
 } NodeFlagEnum;
 
 typedef enum {
