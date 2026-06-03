@@ -182,7 +182,7 @@ static StatusEnum executePipelineNode(ASTNodePtr pipeline_node, ExecuteEnvironme
     return SUCCESS;
 }
 
-static executeSimpleCommandNode(ASTNodePtr command_node, ExecuteEnvironmentPtr env) {
+static StatusEnum executeSimpleCommandNode(ASTNodePtr command_node, ExecuteEnvironmentPtr env) {
     // todo
     return SUCCESS;
 }
