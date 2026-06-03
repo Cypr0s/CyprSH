@@ -33,14 +33,13 @@ typedef enum {
 } NodeTypeEnum;
 
 typedef enum {
-    FLAG_NONE = 0,
-    FLAG_BACKGROUND = 1,
-    FLAG_OR = 2,
-    FLAG_AND = 4,
-    FLAG_PIPE = 8,
-    FLAG_BANG = 16,
-    FLAG_DOUBLE_SEMI = 32,
-    FLAG_SEMI_AND = 64,
+    FLAG_NONE           = 0,
+    FLAG_BACKGROUND     = 1,
+    FLAG_OR             = 2,
+    FLAG_AND            = 4,
+    FLAG_BANG           = 8,
+    FLAG_DOUBLE_SEMI    = 16,
+    FLAG_SEMI_AND       = 32,
 } NodeFlagEnum;
 
 typedef enum {

@@ -195,10 +195,8 @@ static StatusEnum analyzeCompleteCommand(ParserPtr parser, ASTNodePtr complete_c
     ERR_CHECK(st);
 
     if(parser->current_token.type == TOKEN_BG) {
-        // get the list node (last child of complete_command)
         ASTNodePtr list = complete_command->children[complete_command->num_children - 1];
-        // get last and_or in the list
-        list->flags |= FLAG_BACKGROUND;
+        list->children[list->num_children - 1]->flags |= FLAG_BACKGROUND;
         advanceTokens(parser);
     } else if(parser->current_token.type == TOKEN_SEMI) {
         advanceTokens(parser);
@@ -230,25 +228,18 @@ static StatusEnum analyzeList(ParserPtr parser, ASTNodePtr complete_command) {
             break;  // don't consume — leave for analyzeCompleteCommand
         }
 
-        int8_t op = parser->current_token.type == TOKEN_SEMI ? FLAG_NONE : FLAG_BACKGROUND;
-        list->flags = op;
+        // separator follows the last and_or — flag it
+        if(parser->current_token.type == TOKEN_BG) {
+            ASTNodePtr last = list->children[list->num_children - 1];
+            last->flags |= FLAG_BACKGROUND;
+        }
         advanceTokens(parser);
 
-        ASTNodePtr new_list = ASTNodeCtor(NODE_LIST, NULL);
-        if(new_list == NULL) { 
-            ASTFreeTree(list); 
-            return ERROR_MALLOC_FAILURE; 
-        }
-
-        ASTaddChild(new_list, list);  // previous is lower in hierarchy
-
-        st = analyzeAndOr(parser, new_list);
+        st = analyzeAndOr(parser, list);
         if(st != SUCCESS) { 
-            ASTFreeTree(new_list); 
+            ASTFreeTree(list); 
             return st; 
         }
-
-        list = new_list;
     }
 
     ASTaddChild(complete_command, list);
@@ -272,27 +263,21 @@ static StatusEnum analyzeAndOr(ParserPtr parser, ASTNodePtr list) {
 
     while(parser->current_token.type == TOKEN_AND_IF || parser->current_token.type == TOKEN_OR_IF) {
 
-        int8_t op = parser->current_token.type == TOKEN_AND_IF ? FLAG_AND : FLAG_OR;
+        // operator follows the last pipeline — flag it
+        ASTNodePtr last = and_or->children[and_or->num_children - 1];
+        if(parser->current_token.type == TOKEN_AND_IF) {
+            last->flags |= FLAG_AND;
+        } else {
+            last->flags |= FLAG_OR;
+        }
         advanceTokens(parser);
         analyzeLineBreak(parser); // linebreak between AND/OR and pipeline
 
-        ASTNodePtr new_and_or = ASTNodeCtor(NODE_AND_OR, NULL);
-        if(new_and_or == NULL) { 
-            ASTFreeTree(and_or); 
-            return ERROR_MALLOC_FAILURE; 
-        }
-    
-        new_and_or->flags = op;
-
-        ASTaddChild(new_and_or, and_or);  // previous is lower
-
-        st = analyzePipeline(parser, new_and_or);
+        st = analyzePipeline(parser, and_or);
         if(st != SUCCESS) { 
-            ASTFreeTree(new_and_or); 
+            ASTFreeTree(and_or); 
             return st; 
         }
-
-        and_or = new_and_or;
     }
 
     ASTaddChild(list, and_or);
@@ -306,9 +291,8 @@ static StatusEnum analyzePipeline(ParserPtr parser, ASTNodePtr and_or) {
     if(!pipeline) return ERROR_MALLOC_FAILURE;
 
     // optional Bang
-    int8_t has_bang = 0;
     if(parser->current_token.type == TOKEN_BANG) {
-        has_bang = 1;
+        pipeline->flags |= FLAG_BANG;
         advanceTokens(parser);
     }
 
@@ -324,28 +308,14 @@ static StatusEnum analyzePipeline(ParserPtr parser, ASTNodePtr and_or) {
         advanceTokens(parser);
         analyzeLineBreak(parser); // linebreak
 
-        ASTNodePtr new_pipeline = ASTNodeCtor(NODE_PIPELINE, NULL);
-        if(new_pipeline == NULL) { 
-            ASTFreeTree(pipeline); 
-            return ERROR_MALLOC_FAILURE; 
-        }
-        new_pipeline->flags = FLAG_PIPE;
-
-        ASTaddChild(new_pipeline, pipeline);  // previous is right, lower in hierarchy
-
-        st = analyzeCommand(parser, new_pipeline);
+        st = analyzeCommand(parser, pipeline);
         if(st != SUCCESS) { 
-            ASTFreeTree(new_pipeline);
+            ASTFreeTree(pipeline);
             return st;
         }
-
-        pipeline = new_pipeline;
     }
 
     ASTaddChild(and_or, pipeline);
-    if(has_bang) {
-        pipeline->flags |= FLAG_BANG;
-    }
     return SUCCESS;
 }
 
@@ -571,34 +541,30 @@ static StatusEnum analyzeTerm(ParserPtr parser, ASTNodePtr compound_node) {
 
     while(parser->current_token.type == TOKEN_SEMI || parser->current_token.type == TOKEN_BG) {
 
-        int8_t op = parser->current_token.type == TOKEN_SEMI ? FLAG_NONE : FLAG_BACKGROUND;
+        TokenTypeEnum sep_type = parser->current_token.type;
         advanceTokens(parser);
         analyzeLineBreak(parser);
 
         // trailing separator — closing keyword instead of newline/EOF
         if(isCompoundListEnd(parser->current_token)) {
-            if(op == FLAG_BACKGROUND) {
-                term->flags |= FLAG_BACKGROUND;
+            if(sep_type == TOKEN_BG) {
+                ASTNodePtr last = term->children[term->num_children - 1];
+                last->flags |= FLAG_BACKGROUND;
             }
             break;
         }
-        term->flags = op;
 
-        ASTNodePtr new_term = ASTNodeCtor(NODE_LIST, NULL);
-        if(new_term == NULL) {
-            ASTFreeTree(term);
-            return ERROR_MALLOC_FAILURE;
+        // separator follows last and_or — flag it
+        if(sep_type == TOKEN_BG) {
+            ASTNodePtr last = term->children[term->num_children - 1];
+            last->flags |= FLAG_BACKGROUND;
         }
 
-        ASTaddChild(new_term, term);
-
-        st = analyzeAndOr(parser, new_term);
+        st = analyzeAndOr(parser, term);
         if(st != SUCCESS) {
-            ASTFreeTree(new_term);
+            ASTFreeTree(term);
             return st;
         }
-
-        term = new_term;
     }
 
     ASTaddChild(compound_node, term);
