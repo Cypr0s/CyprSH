@@ -9,8 +9,12 @@
 #include <stdlib.h>
 #include "utils/strings.h"
 #include "utils/file.h"
+#include "builtins/builtins.h"
 
 #define MAX_ARGS 64
+ // subject to change, as more builtins will be added(maybe better solution than keeping count?)
+#define BUILTIN_FUNCTION_COUNT 4
+
 
 typedef enum {
     EXEC_FLAG_NONE = 0,
@@ -25,6 +29,13 @@ typedef struct {
     int8_t flags;
     uint8_t last_exec_status;
 } ExecuteEnvironment, *ExecuteEnvironmentPtr;
+
+typedef StatusEnum (*BuiltIn) (int16_t argc, char** argv, ExecuteEnvironmentPtr env);
+
+typedef struct {
+    char* name;
+    BuiltIn func;
+} BuiltinEntry;
 
 StatusEnum executeNode(ASTNodePtr node, ExecuteEnvironmentPtr env);
 

@@ -1,5 +1,13 @@
 #include "executor/execute.h"
 
+
+static BuiltinEntry builtins[BUILTIN_FUNCTION_COUNT] = {
+    {"cd", builtinCd},
+    {"echo", builtinEcho},
+    {"false", builtinFalse},
+    {"true", builtinTrue}
+};
+
 static StatusEnum handlePrefix(ASTNodePtr command_prefix, ExecuteEnvironmentPtr env);
 static StatusEnum handleSuffix(ASTNodePtr command_suffix, char** argv, int16_t* argc);
 static StatusEnum handleRedirect(ASTNodePtr redirect_node);
