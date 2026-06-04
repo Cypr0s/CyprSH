@@ -1,23 +1,22 @@
 #include "utils/file.h"
 
-StatusEnum open_file(const char* path, uint32_t flag, int32_t* file_descriptor) {
+StatusEnum openFile(const char* path, uint32_t flag, int32_t* file_descriptor) {
     *file_descriptor = open(path, flag, 0644);
     if(*file_descriptor != -1) {
         return SUCCESS;
     }
     printErrno(path);
+    if(errno == ENOENT || errno == ENOTDIR) {
+        return ERROR_FILE_NOT_FOUND;
+    }
     if(errno == EACCES || errno == EISDIR) {
-        return ERROR_COMM_CANNOT_EXEC;
+        return ERROR_FILE_NOT_READABLE;
     }
-    else if(errno == ENOENT || errno == ENOTDIR) {
-        return ERROR_COMMAND_NOT_FOUND;
-    }
-    
     return ERROR_DEFAULT;
 }
 
 
-StatusEnum create_file(const char* path) {
+StatusEnum createFile(const char* path) {
     int32_t file_descriptor = open(path, O_CREAT | O_EXCL, 0644);
     if(file_descriptor >= 0) {
         close(file_descriptor);
@@ -28,10 +27,10 @@ StatusEnum create_file(const char* path) {
     }
     printErrno(path);
     if(errno == EACCES || errno == EISDIR) {
-        return ERROR_COMM_CANNOT_EXEC;
+        return ERROR_FILE_NOT_READABLE;
     }
-    else if(errno == ENOTDIR || errno == ENOENT) {
-        return ERROR_COMMAND_NOT_FOUND;
+    if(errno == ENOTDIR || errno == ENOENT) {
+        return ERROR_FILE_NOT_FOUND;
     }
     
     return ERROR_DEFAULT;

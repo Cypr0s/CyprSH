@@ -11,7 +11,8 @@ SRC = 	src/error.c \
         src/data_structures/htab.c \
         src/utils/env.c \
         src/utils/file.c \
-        src/utils/strings.c
+        src/utils/strings.c \
+        src/executor/execute.c
 
 
 OBJ     = $(SRC:.c=.o)

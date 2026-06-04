@@ -6,7 +6,7 @@ int32_t main(int32_t argc, char **argv) {
     extern char **environ;
     int32_t file_descriptor = STDIN_FILENO;
     if(argc == 2) {
-        open_file(argv[1], O_RDONLY, &file_descriptor);
+        openFile(argv[1], O_RDONLY, &file_descriptor);
     }
 
     HashTable env_table;
@@ -21,55 +21,76 @@ int32_t main(int32_t argc, char **argv) {
     return 0;
 }
 
-
+// will need revorking AI generated slop
 StatusEnum runShell(int32_t file_descriptor, HashTablePtr env_table) {
-    (void) env_table;
-    if(isatty(file_descriptor)) {
-        create_file(HISTORY_FILE_PATH);
-        using_history();
-        read_history(HISTORY_FILE_PATH);
-
-        while(1) {
-            char* line = readline("cyprSH> ");
-            if(!line) break;  // EOF (Ctrl+D)
-            if(*line == '\0') { free(line); continue; }
-
-            add_history(line);
-
-            FILE* input = fmemopen(line, strlen(line), "r");
-            if(!input) { free(line); continue; }
-
-            Lexer lexer;
-            lexerCtor(&lexer, input);
-
-            ASTNodePtr ast_root = ASTNodeCtor(NODE_PROGRAM, NULL);
-            if(!ast_root) { lexerDtor(&lexer); fclose(input); free(line); continue; }
-
-            Parser parser;
-            parserCtor(&parser, &lexer);
-            parserReset(&parser);
-
-            StatusEnum st = analyze(&parser, ast_root);
-            if(st == SUCCESS) {
-                #ifdef DEBUG
-                printAST(ast_root, 0);
-                #endif
-            }
-
-            parserDtor(&parser);
-            ASTFreeTree(ast_root);
-            lexerDtor(&lexer);
-            free(line);
-        }
-
-        write_history(HISTORY_FILE_PATH);
+    if(!isatty(file_descriptor)) {
+        // TODO: script mode
+        return SUCCESS;
     }
 
+    createFile(HISTORY_FILE_PATH);
+    using_history();
+    read_history(HISTORY_FILE_PATH);
+
+    // build the execution environment once — reused for every command
+    ExecuteEnvironment env = {
+        .env_table = env_table,
+        .flags = EXEC_FLAG_NONE,
+        .last_exec_status = 0,
+    };
+
+    // lexer and parser created once, reused via reset
+    Lexer lexer;
+    Parser parser;
+    lexerCtor(&lexer, NULL);
+    parserCtor(&parser, &lexer);
+
+    while(1) {
+        char* line = readline("cyprSH> ");
+        if(line == NULL) break;  // EOF (Ctrl+D)
+        if(*line == '\0') {
+            free(line);
+            continue;
+        }
+
+        add_history(line);
+
+        FILE* input = fmemopen(line, strlen(line), "r");
+        if(input == NULL) {
+            free(line);
+            continue;
+        }
+
+        lexerReset(&lexer, input);
+        parserReset(&parser);
+
+        ASTNodePtr ast_root = ASTNodeCtor(NODE_PROGRAM, NULL);
+        if(ast_root == NULL) {
+            free(line);
+            continue;
+        }
+
+        StatusEnum st = analyze(&parser, ast_root);
+        if(st == SUCCESS) {
+            #ifdef DEBUG
+            printAST(ast_root, 0);
+            #endif
+            executeNode(ast_root, &env);
+        }
+
+        ASTFreeTree(ast_root);
+        free(line);
+    }
+
+    write_history(HISTORY_FILE_PATH);
+
+    parserDtor(&parser);
+    lexerDtor(&lexer);
     return SUCCESS;
 }
 
 
-
+// ai slop
 void printAST(ASTNodePtr node, int depth) {
     if(!node) return;
 

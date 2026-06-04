@@ -7,6 +7,7 @@
 #include <readline/history.h>
 #include "parser/syntax.h"
 #include "lexer/lexer.h"
+#include "executor/execute.h"
 
 #define HISTORY_FILE_PATH "./CyprSH_history"
 

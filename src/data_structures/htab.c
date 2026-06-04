@@ -429,3 +429,29 @@ StatusEnum hashTableGetValue(HashTablePtr table, char* key, char** value) {
     *value = item->value;
     return SUCCESS;
 } // hashTableGetValue
+
+
+uint32_t hashTableGetCurrSize(HashTablePtr table) {
+    return table->currentSize;
+}
+
+
+void hashTableIterCtor(HashTableIterPtr table_iterator, HashTablePtr table) {
+    table_iterator->table = table;
+    table_iterator->index = 0;
+}
+
+
+uint8_t hashTableIterNext(HashTableIterPtr table_iterator, char** key, char** value) {
+    while(table_iterator->index < table_iterator->table->capacity) {
+        if(table_iterator->table->data[table_iterator->index].state == ITEM_STATE_FULL) {
+            *key = table_iterator->table->data[table_iterator->index].key;
+            *value = table_iterator->table->data[table_iterator->index].value;
+            table_iterator->index++;
+            return 1U;
+
+        }
+        table_iterator->index++;
+    }
+    return 0U;
+}

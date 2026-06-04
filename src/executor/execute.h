@@ -1,5 +1,5 @@
 #ifndef EXECUTE_H
-#define EXETUCE_H
+#define EXECUTE_H
 
 #include "data_structures/ast.h"
 #include "error.h"
@@ -7,8 +7,10 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <stdlib.h>
+#include "utils/strings.h"
+#include "utils/file.h"
 
-StatusEnum executeNode(ASTNodePtr node, ExecuteEnvironmentPtr env);
+#define MAX_ARGS 64
 
 typedef enum {
     EXEC_FLAG_NONE = 0,
@@ -21,7 +23,9 @@ typedef enum {
 typedef struct {
     HashTablePtr env_table;
     int8_t flags;
-    int8_t last_exec_status;
-} ExecuteEnvironment, * ExecuteEnvironmentPtr;
+    uint8_t last_exec_status;
+} ExecuteEnvironment, *ExecuteEnvironmentPtr;
+
+StatusEnum executeNode(ASTNodePtr node, ExecuteEnvironmentPtr env);
 
 #endif // EXECUTE_H

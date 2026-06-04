@@ -21,3 +21,30 @@ char* strdup(const char* src) {
     memcpy(copy, src, len + 1);
     return copy;
 }
+
+
+StatusEnum splitAssignment(const char* str, char** key, char** value) {
+    if(str == NULL || key == NULL || value == NULL) {
+        return ERROR_DEFAULT;
+    }
+
+    const char* eq = strchr(str, '=');
+    if(eq == NULL) {
+        return ERROR_DEFAULT;  // no = found
+    }
+
+    size_t key_len = (size_t)(eq - str);
+    *key = strndup(str, key_len);
+    if(*key == NULL) {
+        return ERROR_MALLOC_FAILURE;
+    }
+
+    *value = strdup(eq + 1);
+    if(*value == NULL) {
+        free(*key);
+        *key = NULL;
+        return ERROR_MALLOC_FAILURE;
+    }
+
+    return SUCCESS;
+}

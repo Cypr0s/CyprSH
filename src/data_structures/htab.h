@@ -28,6 +28,12 @@ typedef struct hashtable {
 } HashTable, *HashTablePtr;
 
 
+typedef struct {
+    HashTablePtr table;
+    uint32_t index;
+} HashTableIter, *HashTableIterPtr;
+
+
 /**
  * @brief       Initializes open adressing resizable hashtable
  *              
@@ -101,5 +107,12 @@ StatusEnum hashTableRemove(HashTablePtr table, const char* key);
  *              or index is empty or deleted corresponding error codes are returned otherwise 0(SUCCESS) is returned
  */
 StatusEnum hashTableGetValue(HashTablePtr table, char* key, char** value);
+
+
+uint32_t hashTableGetCurrSize(HashTablePtr table);
+
+void hashTableIterCtor(HashTableIterPtr table_iterator, HashTablePtr table);
+
+uint8_t hashTableIterNext(HashTableIterPtr table_iterator, char** key, char** value);
 
 #endif // HTAB_H
