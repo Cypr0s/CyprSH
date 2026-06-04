@@ -17,17 +17,45 @@ make debug    # debug build with sanitizers
 ## Usage
 ```sh
 ./cyprsh              # interactive mode
-./cyprsh script.sh    # script mode
 ```
 
 ## Status
 Work in progress. Currently implemented:
 - [x] Lexer
 - [x] Parser
-- [ ] Executor
+- [X] Executor (partially, only external commands)
+- [x] Pipelines
+- [x] Redirections
 - [ ] Word expansion
 - [ ] Builtins
 - [ ] Job control
+
+## Examples
+```sh
+cyprSH> echo "Hello world"
+Hello world
+
+cyprSH> ls -la | wc -l
+14
+
+cyprSH> echo first > test.txt
+cyprSH> echo second >> test.txt
+cyprSH> cat test.txt
+first
+second
+
+cyprSH> date; whoami; pwd
+Thu Jun  4 07:14:15 PM CEST 2026
+luptakk
+/home/luptakk
+
+cyprSH> echo a && echo b
+a
+b
+
+cyprSH> false || echo "fallback"
+fallback
+```
 
 ## License
 GPL v3
