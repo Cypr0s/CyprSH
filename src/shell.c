@@ -28,9 +28,17 @@ StatusEnum runShell(int32_t file_descriptor, HashTablePtr env_table) {
         return SUCCESS;
     }
 
-    createFile(HISTORY_FILE_PATH);
+    char history_path[PATH_MAX] = {0};
+    char* home = getenv("HOME");
+    if(home != NULL) {
+        snprintf(history_path, sizeof(history_path), "%s/%s", home, HISTORY_FILE_NAME);
+    } else {
+        snprintf(history_path, sizeof(history_path), "./%s", HISTORY_FILE_NAME);
+    }
+
+    createFile(history_path);
     using_history();
-    read_history(HISTORY_FILE_PATH);
+    read_history(history_path);
 
     // build the execution environment once — reused for every command
     ExecuteEnvironment env = {
@@ -86,7 +94,7 @@ StatusEnum runShell(int32_t file_descriptor, HashTablePtr env_table) {
     }
 
 
-    write_history(HISTORY_FILE_PATH);
+    write_history(history_path);
 
     parserDtor(&parser);
     lexerDtor(&lexer);

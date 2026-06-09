@@ -9,7 +9,7 @@
 #include "lexer/lexer.h"
 #include "executor/execute.h"
 
-#define HISTORY_FILE_PATH "./CyprSH_history"
+#define HISTORY_FILE_NAME "CyprSH_history"
 
 StatusEnum runShell(int32_t file_descriptor, HashTablePtr env_table);
 
