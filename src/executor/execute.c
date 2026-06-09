@@ -1,11 +1,16 @@
 #include "executor/execute.h"
 
 
-static BuiltinEntry builtins[BUILTIN_FUNCTION_COUNT] = {
-    {"cd", builtinCd},
-    {"echo", builtinEcho},
-    {"false", builtinFalse},
-    {"true", builtinTrue}
+static const BuiltinEntry builtins[] = {
+    {"cd",     builtinCd},
+    {"exit",   builtinExit},
+    {"export", builtinExport},
+    {"unset",  builtinUnset},
+    {"pwd",    builtinPwd},
+    {"echo",   builtinEcho},
+    {"true",   builtinTrue},
+    {"false",  builtinFalse},
+    {":",      builtinTrue}, // works same as true
 };
 
 static StatusEnum handlePrefix(ASTNodePtr command_prefix, ExecuteEnvironmentPtr env);
@@ -15,6 +20,7 @@ static void getDefaultFD(RedirectTypeEnum type, int32_t* fd);
 static int8_t isBuiltin(const char* function_name);
 static char** buildEnvp(HashTablePtr env);
 static char* findPath(const char* cmd, const char* path_env);
+static BuiltIn findBuiltin(const char* function_name);
 
 static StatusEnum executeProgramNode(ASTNodePtr program_node, ExecuteEnvironmentPtr env);
 static StatusEnum executeCompleteCommandNode(ASTNodePtr command_node, ExecuteEnvironmentPtr env);
@@ -25,8 +31,24 @@ static StatusEnum executeSimpleCommandNode(ASTNodePtr command_node, ExecuteEnvir
 
 
 static int8_t isBuiltin(const char* function_name) {
-    (void)function_name;
-    return 0;  // no builtins yet
+    if(function_name == NULL) return 0;
+    
+    size_t count = sizeof(builtins) / sizeof(builtins[0]);
+    for(size_t i = 0; i < count; i++) {
+        if(streq(function_name, builtins[i].name)) return 1;
+    }
+    return 0;
+}
+
+
+static BuiltIn findBuiltin(const char* function_name) {
+    if(function_name == NULL) return NULL;
+    
+    size_t count = sizeof(builtins) / sizeof(builtins[0]);
+    for(size_t i = 0; i < count; i++) {
+        if(streq(function_name, builtins[i].name)) return builtins[i].func;
+    }
+    return NULL;
 }
 
 
@@ -299,7 +321,7 @@ static StatusEnum executeCompleteCommandNode(ASTNodePtr command_node, ExecuteEnv
 
 
 static StatusEnum executeListNode(ASTNodePtr list_node, ExecuteEnvironmentPtr env) {
-     if(list_node->num_children == 0) {
+    if(list_node->num_children == 0) {
         return ERROR_SYNTAX_ERROR;
     }
 
@@ -309,14 +331,17 @@ static StatusEnum executeListNode(ASTNodePtr list_node, ExecuteEnvironmentPtr en
         ASTNodePtr child = list_node->children[i];
 
         // child flag, run whole on background
-        int8_t saved_flags = env->flags;
         if(child->flags & FLAG_BACKGROUND) {
             env->flags |= EXEC_FLAG_BG;
+        } else {
+            env->flags &= ~EXEC_FLAG_BG;
         }
 
         st = executeNode(child, env);
         ERR_CHECK(st);
-        env->flags = saved_flags;
+
+        // stop if exit was triggered
+        if(env->flags & EXEC_FLAG_EXIT) break;
     }
 
     return st;
@@ -459,7 +484,40 @@ static StatusEnum executeSimpleCommandNode(ASTNodePtr command_node, ExecuteEnvir
 
     // builtin, not pipelined
     if(isBuiltin(cmd_word->value) && !(env->flags & EXEC_FLAG_CHILD_PROCESS)) {
-        env->last_exec_status = 0;
+        int32_t saved_stdin = dup(STDIN_FILENO);
+        int32_t saved_stdout = dup(STDOUT_FILENO);
+        int32_t saved_stderr = dup(STDERR_FILENO);
+
+        char* argv[MAX_ARGS + 1];
+        argv[0] = cmd_word->value;
+        int16_t argc = 1;
+
+        StatusEnum st = SUCCESS;
+        for(int16_t i = 0; i < command_node->num_children; i++) {
+            ASTNodePtr child = command_node->children[i];
+            if(child->type == NODE_CMD_PREFIX) {
+                st = handlePrefix(child, env);
+                if(st != SUCCESS) break;
+            } else if(child->type == NODE_CMD_SUFFIX) {
+                st = handleSuffix(child, argv, &argc);
+                if(st != SUCCESS) break;
+            }
+        }
+        argv[argc] = NULL;
+
+        if(st == SUCCESS) {
+            BuiltIn fn = findBuiltin(cmd_word->value);
+            fn(argc, argv, env);
+        }
+
+        // restore fds
+        dup2(saved_stdin, STDIN_FILENO);
+        dup2(saved_stdout, STDOUT_FILENO);
+        dup2(saved_stderr, STDERR_FILENO);
+        close(saved_stdin);
+        close(saved_stdout);
+        close(saved_stderr);
+
         return SUCCESS;
     }
 

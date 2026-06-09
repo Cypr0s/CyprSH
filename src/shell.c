@@ -80,7 +80,11 @@ StatusEnum runShell(int32_t file_descriptor, HashTablePtr env_table) {
 
         ASTFreeTree(ast_root);
         free(line);
+        if(env.flags & EXEC_FLAG_EXIT) {
+            break;
+        }
     }
+
 
     write_history(HISTORY_FILE_PATH);
 

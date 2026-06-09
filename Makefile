@@ -2,19 +2,9 @@ CC = gcc
 CFLAGS = -Wall -Wextra -Isrc
 LDFLAGS = -lreadline
 
-SRC = 	src/error.c \
-        src/shell.c \
-        src/lexer/lexer.c \
-        src/parser/syntax.c \
-        src/data_structures/ast.c \
-        src/data_structures/stack.c \
-        src/data_structures/htab.c \
-        src/utils/env.c \
-        src/utils/file.c \
-        src/utils/strings.c \
-        src/executor/execute.c
 
 
+SRC    := $(shell find src -name '*.c')
 OBJ     = $(SRC:.c=.o)
 TARGET  = cyprsh
 
