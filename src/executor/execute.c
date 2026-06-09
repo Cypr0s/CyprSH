@@ -483,7 +483,7 @@ static StatusEnum executeSimpleCommandNode(ASTNodePtr command_node, ExecuteEnvir
     }
 
     // builtin, not pipelined
-    if(isBuiltin(cmd_word->value) && !(env->flags & EXEC_FLAG_CHILD_PROCESS)) {
+    if(isBuiltin(cmd_word->value)) {
         int32_t saved_stdin = dup(STDIN_FILENO);
         int32_t saved_stdout = dup(STDOUT_FILENO);
         int32_t saved_stderr = dup(STDERR_FILENO);
@@ -517,6 +517,11 @@ static StatusEnum executeSimpleCommandNode(ASTNodePtr command_node, ExecuteEnvir
         close(saved_stdin);
         close(saved_stdout);
         close(saved_stderr);
+
+        if(env->flags & EXEC_FLAG_CHILD_PROCESS) {
+            fflush(stdout);
+            exit(env->last_exec_status);
+        }
 
         return SUCCESS;
     }
