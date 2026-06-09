@@ -2,6 +2,11 @@
 
 All notable changes to CyprSH will be documented here.
 
+## [1.0.1] - 2026-06-10
+
+### Fixed
+- History file now persists across sessions (bugged due to builtins)
+
 ## [1.0.0] - 2026-06-04
 
 ### Added
