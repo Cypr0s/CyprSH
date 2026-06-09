@@ -5,8 +5,15 @@ A minimalistic POSIX-compliant shell written in C from scratch to deepen my unde
 ## Features
 - Lexer with full POSIX token recognition
 - Recursive descent parser
+- External command execution via fork + execve
+- Pipelines (`cmd1 | cmd2 | cmd3`)
+- I/O redirections (`>`, `>>`, `<`, `<>`, `>|`, `>&`, `<&`)
+- Command lists (`;`, `&&`, `||`)
+- Background execution (`&`)
+- Environment variable assignments (`VAR=value cmd`)
+- Quoting (single, double, backslash)
+- Builtins: `cd`, `exit`, `export`, `unset`, `pwd`, `echo`, `true`, `false`, `:`
 - Interactive mode with readline history
-- Script mode
 
 ## Building
 ```sh
@@ -18,17 +25,6 @@ make debug    # debug build with sanitizers
 ```sh
 ./cyprsh              # interactive mode
 ```
-
-## Status
-Work in progress. Currently implemented:
-- [x] Lexer
-- [x] Parser
-- [X] Executor (partially, only external commands)
-- [x] Pipelines
-- [x] Redirections
-- [ ] Word expansion
-- [ ] Builtins
-- [ ] Job control
 
 ## Examples
 ```sh
@@ -55,7 +51,30 @@ b
 
 cyprSH> false || echo "fallback"
 fallback
+
+cyprSH> cd /tmp && pwd
+/tmp
+
+cyprSH> export FOO=bar
+cyprSH> export | head -3
+export XDG_SESSION_CLASS="user"
+export __ETC_PROFILE_NIX_SOURCED="1"
+export _="./cyprsh"
 ```
+
+## Status
+- [x] Lexer
+- [x] Parser
+- [x] Executor (external commands)
+- [x] Pipelines
+- [x] Redirections
+- [x] Essential builtins
+- [ ] Word expansion (`$VAR`, `${VAR}`, globbing)
+- [ ] Compound command execution (`if`/`while`/`for`/`case`)
+- [ ] Functions
+- [ ] Heredocs
+- [ ] Job control
+- [ ] Signal handling
 
 ## License
 GPL v3
