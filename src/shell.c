@@ -72,7 +72,7 @@ StatusEnum runShell(int32_t file_descriptor, HashTablePtr env_table) {
         lexerReset(&lexer, input);
         parserReset(&parser);
 
-        ASTNodePtr ast_root = ASTNodeCtor(NODE_PROGRAM, NULL);
+        ASTNodePtr ast_root = ASTNodeCtor(NODE_PROGRAM, NULL, NULL);
         if(ast_root == NULL) {
             free(line);
             continue;
