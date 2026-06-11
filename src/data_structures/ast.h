@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "error.h"
+#include "utils/strings.h"
 
 typedef enum {
     NODE_PROGRAM,
@@ -60,14 +61,14 @@ typedef enum {
 typedef struct ASTNode {
     NodeTypeEnum type;
     char* value;
+    int8_t* value_types;
     int32_t flags;
-    struct ASTNode* parent;
     struct ASTNode** children;
     int16_t num_children;
 } ASTNode, *ASTNodePtr, **ASTNodePtrPtr;
 
 
-ASTNodePtr ASTNodeCtor(NodeTypeEnum type, char* value);
+ASTNodePtr ASTNodeCtor(NodeTypeEnum type, char* value, int8_t* value_types);
 
 void ASTNodeDtor(ASTNodePtr node);
 

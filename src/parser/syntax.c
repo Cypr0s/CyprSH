@@ -7,7 +7,7 @@ static const char* COMPOUND_END_KEYWORDS[] = {
 };
 
 static void advanceTokens(ParserPtr parser);
-static ASTNodePtr createAndInsert(ASTNodePtr parent, NodeTypeEnum type, char* value);
+static ASTNodePtr createAndInsert(ASTNodePtr parent, NodeTypeEnum type, char* value, int8_t* value_types);
 static uint8_t isRedirectOperator(TokenTypeEnum type);
 static int32_t tokenToRedirectType(TokenTypeEnum type);
 static uint8_t isAssignmentWord(const char* word);
@@ -49,8 +49,8 @@ static void advanceTokens(ParserPtr parser) {
 }
 
 
-static ASTNodePtr createAndInsert(ASTNodePtr parent, NodeTypeEnum type, char* value) {
-    ASTNodePtr node = ASTNodeCtor(type, value);
+static ASTNodePtr createAndInsert(ASTNodePtr parent, NodeTypeEnum type, char* value, int8_t* value_types) {
+    ASTNodePtr node = ASTNodeCtor(type, value, value_types);
     if(node == NULL) {
         return NULL;
     }
@@ -158,7 +158,7 @@ static StatusEnum analyzeProgram(ParserPtr parser, ASTNodePtr ast_root) {
     }
 
     // creat command node
-    ASTNodePtr complete_command_node = createAndInsert(ast_root, NODE_COMPLETE_COMMAND, NULL);
+    ASTNodePtr complete_command_node = createAndInsert(ast_root, NODE_COMPLETE_COMMAND, NULL, NULL);
     if(complete_command_node == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -177,7 +177,7 @@ static StatusEnum analyzeProgram(ParserPtr parser, ASTNodePtr ast_root) {
         }
 
         // creat command node
-        ASTNodePtr complete_command_node = createAndInsert(ast_root, NODE_COMPLETE_COMMAND, NULL);
+        ASTNodePtr complete_command_node = createAndInsert(ast_root, NODE_COMPLETE_COMMAND, NULL, NULL);
         if(complete_command_node == NULL) {
             return ERROR_MALLOC_FAILURE;
         }
@@ -208,7 +208,7 @@ static StatusEnum analyzeCompleteCommand(ParserPtr parser, ASTNodePtr complete_c
 
 static StatusEnum analyzeList(ParserPtr parser, ASTNodePtr complete_command) {
     // create list
-    ASTNodePtr list = ASTNodeCtor(NODE_LIST, NULL);
+    ASTNodePtr list = ASTNodeCtor(NODE_LIST, NULL, NULL);
     if(list == NULL) { 
         return ERROR_MALLOC_FAILURE; 
     }
@@ -249,7 +249,7 @@ static StatusEnum analyzeList(ParserPtr parser, ASTNodePtr complete_command) {
 
 static StatusEnum analyzeAndOr(ParserPtr parser, ASTNodePtr list) {
     // create and_or
-    ASTNodePtr and_or = ASTNodeCtor(NODE_AND_OR, NULL);
+    ASTNodePtr and_or = ASTNodeCtor(NODE_AND_OR, NULL, NULL);
     if(and_or == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -287,7 +287,7 @@ static StatusEnum analyzeAndOr(ParserPtr parser, ASTNodePtr list) {
 
 static StatusEnum analyzePipeline(ParserPtr parser, ASTNodePtr and_or) {
     // create pipeline node
-    ASTNodePtr pipeline = ASTNodeCtor(NODE_PIPELINE, NULL);
+    ASTNodePtr pipeline = ASTNodeCtor(NODE_PIPELINE, NULL, NULL);
     if(!pipeline) return ERROR_MALLOC_FAILURE;
 
     // optional Bang
@@ -344,7 +344,7 @@ StatusEnum analyzeCommand(ParserPtr parser, ASTNodePtr pipeline) {
 
 
 static StatusEnum analyzeSimpleCommand(ParserPtr parser, ASTNodePtr pipeline) {
-    ASTNodePtr command = createAndInsert(pipeline, NODE_SIMPLE_COMMAND, NULL);
+    ASTNodePtr command = createAndInsert(pipeline, NODE_SIMPLE_COMMAND, NULL, NULL);
     if(command == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -353,7 +353,7 @@ static StatusEnum analyzeSimpleCommand(ParserPtr parser, ASTNodePtr pipeline) {
     if((parser->current_token.type == TOKEN_WORD && isAssignmentWord(parser->current_token.value)) ||
         parser->current_token.type == TOKEN_IO_NUM || 
         isRedirectOperator(parser->current_token.type)) {
-        ASTNodePtr cmd_prefix = createAndInsert(command, NODE_CMD_PREFIX, NULL);
+        ASTNodePtr cmd_prefix = createAndInsert(command, NODE_CMD_PREFIX, NULL, NULL);
         if(cmd_prefix == NULL) {
             return ERROR_MALLOC_FAILURE;
         }
@@ -364,7 +364,7 @@ static StatusEnum analyzeSimpleCommand(ParserPtr parser, ASTNodePtr pipeline) {
 
     // cmd word
     if(parser->current_token.type == TOKEN_WORD) {
-        ASTNodePtr cmd_word = createAndInsert(command, NODE_CMD_WORD, parser->current_token.value);
+        ASTNodePtr cmd_word = createAndInsert(command, NODE_CMD_WORD, parser->current_token.value, parser->current_token.char_types);
         if(cmd_word == NULL) {
             return ERROR_MALLOC_FAILURE;
         }
@@ -376,7 +376,7 @@ static StatusEnum analyzeSimpleCommand(ParserPtr parser, ASTNodePtr pipeline) {
            isRedirectOperator(parser->current_token.type)) 
         {
 
-            ASTNodePtr cmd_suffix = createAndInsert(command, NODE_CMD_SUFFIX, NULL);
+            ASTNodePtr cmd_suffix = createAndInsert(command, NODE_CMD_SUFFIX, NULL, NULL);
             if(!cmd_suffix) { 
                 return ERROR_MALLOC_FAILURE;
             }
@@ -404,7 +404,7 @@ static StatusEnum analyzeCmdPrefix(ParserPtr parser, ASTNodePtr cmd_prefix) {
         if(parser->current_token.type == TOKEN_WORD && 
             isAssignmentWord(parser->current_token.value)) 
         {
-            ASTNodePtr assign = createAndInsert(cmd_prefix, NODE_ASSIGNMENT_WORD, parser->current_token.value);
+            ASTNodePtr assign = createAndInsert(cmd_prefix, NODE_ASSIGNMENT_WORD, parser->current_token.value, parser->current_token.char_types);
     
             if(assign == NULL) {
                  return ERROR_MALLOC_FAILURE;
@@ -421,14 +421,14 @@ static StatusEnum analyzeCmdPrefix(ParserPtr parser, ASTNodePtr cmd_prefix) {
 
 
 static StatusEnum analyzeRedirect(ParserPtr parser, ASTNodePtr cmd_prefix) {
-    ASTNodePtr redirect = createAndInsert(cmd_prefix, NODE_REDIRECT, NULL);
+    ASTNodePtr redirect = createAndInsert(cmd_prefix, NODE_REDIRECT, NULL, NULL);
     if(redirect == NULL) { 
         return ERROR_MALLOC_FAILURE;
     }
 
     // optional IO_NUM
     if(parser->current_token.type == TOKEN_IO_NUM) {
-        ASTNodePtr io_num = createAndInsert(redirect, NODE_IO_NUM, parser->current_token.value);
+        ASTNodePtr io_num = createAndInsert(redirect, NODE_IO_NUM, parser->current_token.value, NULL);
         if(io_num == NULL) {
             return ERROR_MALLOC_FAILURE;
         }
@@ -448,7 +448,7 @@ static StatusEnum analyzeRedirect(ParserPtr parser, ASTNodePtr cmd_prefix) {
         fprintf(stderr, "CyprSH: syntax error at line %d: expected redirect target\n", parser->lexer->line);
         return ERROR_SYNTAX_ERROR;
     }
-    ASTNodePtr word = createAndInsert(redirect, NODE_WORD, parser->current_token.value);
+    ASTNodePtr word = createAndInsert(redirect, NODE_WORD, parser->current_token.value, parser->current_token.char_types);
     if(word == NULL) { 
         return ERROR_MALLOC_FAILURE; 
     }
@@ -464,7 +464,7 @@ static StatusEnum analyzeCmdSuffix(ParserPtr parser, ASTNodePtr cmd_suffix) {
           isRedirectOperator(parser->current_token.type)) 
     {
         if(parser->current_token.type == TOKEN_WORD) {
-            ASTNodePtr word = createAndInsert(cmd_suffix, NODE_WORD, parser->current_token.value);
+            ASTNodePtr word = createAndInsert(cmd_suffix, NODE_WORD, parser->current_token.value, parser->current_token.char_types);
             if(word == NULL) { 
                 return ERROR_MALLOC_FAILURE; 
             }
@@ -480,7 +480,7 @@ static StatusEnum analyzeCmdSuffix(ParserPtr parser, ASTNodePtr cmd_suffix) {
 
 static StatusEnum analyzeSubshell(ParserPtr parser, ASTNodePtr pipeline) {
     // create subshell node
-    ASTNodePtr subshell = createAndInsert(pipeline, NODE_SUBSHELL, NULL);
+    ASTNodePtr subshell = createAndInsert(pipeline, NODE_SUBSHELL, NULL, NULL);
     if(subshell == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -528,7 +528,7 @@ static StatusEnum analyzeCompoundList(ParserPtr parser, ASTNodePtr parent) {
 }
 
 static StatusEnum analyzeTerm(ParserPtr parser, ASTNodePtr compound_node) {
-    ASTNodePtr term = ASTNodeCtor(NODE_LIST, NULL);
+    ASTNodePtr term = ASTNodeCtor(NODE_LIST, NULL, NULL);
     if(term == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -573,7 +573,7 @@ static StatusEnum analyzeTerm(ParserPtr parser, ASTNodePtr compound_node) {
 
 static StatusEnum analyzeBraceGroup(ParserPtr parser, ASTNodePtr pipeline) {
     // create group node
-    ASTNodePtr group = createAndInsert(pipeline, NODE_BRACE_GROUP, NULL);
+    ASTNodePtr group = createAndInsert(pipeline, NODE_BRACE_GROUP, NULL, NULL);
     if(group == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -602,7 +602,7 @@ static StatusEnum analyzeBraceGroup(ParserPtr parser, ASTNodePtr pipeline) {
 
 static StatusEnum analyzeIfClause(ParserPtr parser, ASTNodePtr pipeline) {
     // create if node
-    ASTNodePtr if_clause = createAndInsert(pipeline, NODE_IF_CLAUSE, NULL);
+    ASTNodePtr if_clause = createAndInsert(pipeline, NODE_IF_CLAUSE, NULL, NULL);
     if(if_clause == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -642,13 +642,13 @@ static StatusEnum analyzeIfClause(ParserPtr parser, ASTNodePtr pipeline) {
 static StatusEnum analyzeElsePart(ParserPtr parser, ASTNodePtr if_clause) {
     if(streq(parser->current_token.value, "else")) {
         advanceTokens(parser);
-        ASTNodePtr else_clause = createAndInsert(if_clause, NODE_ELSE_CLAUSE, NULL);
+        ASTNodePtr else_clause = createAndInsert(if_clause, NODE_ELSE_CLAUSE, NULL, NULL);
         StatusEnum st = analyzeCompoundList(parser, else_clause);
         ERR_CHECK(st);
     } else if(streq(parser->current_token.value, "elif")) {
         advanceTokens(parser);
 
-        ASTNodePtr elif_clause = createAndInsert(if_clause, NODE_IF_CLAUSE, NULL);
+        ASTNodePtr elif_clause = createAndInsert(if_clause, NODE_IF_CLAUSE, NULL, NULL);
         if(!elif_clause) return ERROR_MALLOC_FAILURE;
 
         StatusEnum st = analyzeCompoundList(parser, elif_clause);
@@ -676,7 +676,7 @@ static StatusEnum analyzeElsePart(ParserPtr parser, ASTNodePtr if_clause) {
 
 static StatusEnum analyzeWhileClause(ParserPtr parser, ASTNodePtr pipeline) {
     // create while node
-    ASTNodePtr while_clause = createAndInsert(pipeline, NODE_WHILE_CLAUSE, NULL);
+    ASTNodePtr while_clause = createAndInsert(pipeline, NODE_WHILE_CLAUSE, NULL, NULL);
     if(while_clause == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -719,7 +719,7 @@ static StatusEnum analyzeDoGroup(ParserPtr parser, ASTNodePtr parent) {
 
 static StatusEnum analyzeUntilClause(ParserPtr parser, ASTNodePtr pipeline) {
     // create until node
-    ASTNodePtr until_clause = createAndInsert(pipeline, NODE_UNTIL_CLAUSE, NULL);
+    ASTNodePtr until_clause = createAndInsert(pipeline, NODE_UNTIL_CLAUSE, NULL, NULL);
     if(until_clause == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -741,7 +741,7 @@ static StatusEnum analyzeUntilClause(ParserPtr parser, ASTNodePtr pipeline) {
 
 static StatusEnum analyzeForClause(ParserPtr parser, ASTNodePtr pipeline) {
     // create for node
-    ASTNodePtr for_clause = createAndInsert(pipeline, NODE_FOR_CLAUSE, NULL);
+    ASTNodePtr for_clause = createAndInsert(pipeline, NODE_FOR_CLAUSE, NULL, NULL);
     if(for_clause == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -758,7 +758,7 @@ static StatusEnum analyzeForClause(ParserPtr parser, ASTNodePtr pipeline) {
         fprintf(stderr, "CyprSH: syntax error at line %d: expected word after 'for'\n", parser->lexer->line);
         return ERROR_SYNTAX_ERROR;
     }
-    ASTNodePtr var = createAndInsert(for_clause, NODE_WORD, parser->current_token.value);
+    ASTNodePtr var = createAndInsert(for_clause, NODE_WORD, parser->current_token.value, parser->current_token.char_types);
     if(var == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -776,7 +776,7 @@ static StatusEnum analyzeForClause(ParserPtr parser, ASTNodePtr pipeline) {
         advanceTokens(parser);
         // word list optional
         while(parser->current_token.type == TOKEN_WORD) {
-            ASTNodePtr word = createAndInsert(for_clause, NODE_WORD, parser->current_token.value);
+            ASTNodePtr word = createAndInsert(for_clause, NODE_WORD, parser->current_token.value, parser->current_token.char_types);
             if(!word) return ERROR_MALLOC_FAILURE;
             advanceTokens(parser);
         }
@@ -806,7 +806,7 @@ static StatusEnum analyzeForClause(ParserPtr parser, ASTNodePtr pipeline) {
 
 static StatusEnum analyzeCaseClause(ParserPtr parser, ASTNodePtr pipeline) {
     // create case node
-    ASTNodePtr case_clause = createAndInsert(pipeline, NODE_CASE_CLAUSE, NULL);
+    ASTNodePtr case_clause = createAndInsert(pipeline, NODE_CASE_CLAUSE, NULL, NULL);
     if(case_clause == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -821,7 +821,7 @@ static StatusEnum analyzeCaseClause(ParserPtr parser, ASTNodePtr pipeline) {
         fprintf(stderr, "CyprSH: syntax error at line %d: expected word after 'case'\n", parser->lexer->line);
         return ERROR_SYNTAX_ERROR;
     }
-    ASTNodePtr word = createAndInsert(case_clause, NODE_WORD, parser->current_token.value);
+    ASTNodePtr word = createAndInsert(case_clause, NODE_WORD, parser->current_token.value, parser->current_token.char_types);
     if(word == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -856,7 +856,7 @@ static StatusEnum analyzeCaseClause(ParserPtr parser, ASTNodePtr pipeline) {
 
 
 static StatusEnum analyzeCaseItem(ParserPtr parser, ASTNodePtr case_clause) {
-    ASTNodePtr item = createAndInsert(case_clause, NODE_CASE_ITEM, NULL);
+    ASTNodePtr item = createAndInsert(case_clause, NODE_CASE_ITEM, NULL, NULL);
     if(!item) return ERROR_MALLOC_FAILURE;
 
     // optional leading (
@@ -877,7 +877,7 @@ static StatusEnum analyzeCaseItem(ParserPtr parser, ASTNodePtr case_clause) {
         return ERROR_SYNTAX_ERROR;
     }
 
-    ASTNodePtr pattern = createAndInsert(item, NODE_WORD, parser->current_token.value);
+    ASTNodePtr pattern = createAndInsert(item, NODE_WORD, parser->current_token.value, parser->current_token.char_types);
     if(pattern == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -890,7 +890,7 @@ static StatusEnum analyzeCaseItem(ParserPtr parser, ASTNodePtr case_clause) {
             fprintf(stderr, "CyprSH: syntax error at line %d: expected pattern after '|'\n", parser->lexer->line);
             return ERROR_SYNTAX_ERROR;
         }
-        ASTNodePtr p = createAndInsert(item, NODE_WORD, parser->current_token.value);
+        ASTNodePtr p = createAndInsert(item, NODE_WORD, parser->current_token.value, parser->current_token.char_types);
         if(p == NULL) {
             return ERROR_MALLOC_FAILURE;
         }
@@ -930,7 +930,7 @@ static StatusEnum analyzeCaseItem(ParserPtr parser, ASTNodePtr case_clause) {
 
 static StatusEnum analyzeFunctionDef(ParserPtr parser, ASTNodePtr pipeline) {
     // create function node
-    ASTNodePtr function = createAndInsert(pipeline, NODE_FUNCTION_DEF, NULL);
+    ASTNodePtr function = createAndInsert(pipeline, NODE_FUNCTION_DEF, NULL, NULL);
     if(function == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -940,7 +940,7 @@ static StatusEnum analyzeFunctionDef(ParserPtr parser, ASTNodePtr pipeline) {
         fprintf(stderr, "CyprSH: syntax error at line %d: expected function name\n", parser->lexer->line);
         return ERROR_SYNTAX_ERROR;
     }
-    ASTNodePtr name = createAndInsert(function, NODE_WORD, parser->current_token.value);
+    ASTNodePtr name = createAndInsert(function, NODE_WORD, parser->current_token.value, parser->current_token.char_types);
     if(name == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
