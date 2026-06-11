@@ -3,7 +3,9 @@
 StatusEnum builtinEcho(int16_t argc, char** argv, ExecuteEnvironmentPtr env) {
     for(int16_t i = 1; i < argc; i++) {
         printf("%s", argv[i]);
-        if(i < argc - 1) printf(" ");
+        if(i < argc - 1) {
+            printf(" ");
+        }
     }
 
     printf("\n");

@@ -2,9 +2,9 @@
 
 // utils
 static int32_t getCharacter(LexerPtr lex);
-static Token createToken(TokenTypeEnum type, char* value);
+static Token createToken(TokenTypeEnum type, char* value, int8_t* types);
 static Token errorToken(void);
-static uint8_t pushBuffer(LexerPtr lex,const char c);
+static uint8_t pushBuffer(LexerPtr lex, const char c, int8_t type);
 static int isWordDelimiter(int32_t c);
 
 // state handlers
@@ -32,30 +32,32 @@ static int32_t getCharacter(LexerPtr lex) {
 }
 
 
-static Token createToken(TokenTypeEnum type, char* value) {
+static Token createToken(TokenTypeEnum type, char* value, int8_t* types) {
     Token t;
     t.type = type;
     t.value = value;
+    t.char_types = types;
     return t;
 }
 
 
 static Token errorToken(void) {
-    return createToken(TOKEN_ERROR, NULL);
+    return createToken(TOKEN_ERROR, NULL, NULL);
 }
 
 
 Token nullToken(void) {
-    return createToken(TOKEN_NULL, NULL);
+    return createToken(TOKEN_NULL, NULL, NULL);
 }
 
 
-static uint8_t pushBuffer(LexerPtr lex,const char c) {
+static uint8_t pushBuffer(LexerPtr lex,const char c, int8_t type) {
     if(lex->buffer_pos >= MAX_TOKEN_LENGTH - 1) {
         fprintf(stderr, "lexer buffer overflow at line %d\n", lex->line);
         return 0;
     }
-    lex->buffer[lex->buffer_pos++] = c;
+    lex->char_buffer[lex->buffer_pos] = c;
+    lex->type_buffer[lex->buffer_pos++] = type;
     return 1;
 }
 
@@ -77,12 +79,12 @@ static Token handleStart(LexerPtr lex, int32_t c) {
     switch (c) {
         /* special characters */
         case EOF:
-            return createToken(TOKEN_EOF, NULL);
+            return createToken(TOKEN_EOF, NULL, NULL);
         case '#':
             stackPush(&lex->token_stack, (int8_t)STATE_COMMENT);
             return nullToken();
         case '\n':
-            return createToken(TOKEN_NEWLINE, NULL);
+            return createToken(TOKEN_NEWLINE, NULL, NULL);
 
         /* whitespaces */
         case ' ': case '\t':
@@ -92,57 +94,57 @@ static Token handleStart(LexerPtr lex, int32_t c) {
         case ';':
             // semicolon and double semicolon
             c2 = getCharacter(lex);
-            if(c2 == ';') return createToken(TOKEN_DOUBLE_SEMI, NULL);
-            if(c2 == '&') return createToken(TOKEN_SEMI_AND, NULL);
+            if(c2 == ';') return createToken(TOKEN_DOUBLE_SEMI, NULL, NULL);
+            if(c2 == '&') return createToken(TOKEN_SEMI_AND, NULL, NULL);
             lex->lookahead = c2;
-            return createToken(TOKEN_SEMI, NULL);
+            return createToken(TOKEN_SEMI, NULL, NULL);
         case '|':
             // pipe and OR_IF
             c2 = getCharacter(lex);
-            if(c2 == '|') return createToken(TOKEN_OR_IF, NULL);
+            if(c2 == '|') return createToken(TOKEN_OR_IF, NULL, NULL);
             lex->lookahead = c2;
-            return createToken(TOKEN_PIPE, NULL);
+            return createToken(TOKEN_PIPE, NULL, NULL);
         case '&':
         // ampersand and AND_IF
             c2 = getCharacter(lex);
-            if(c2 == '&') return createToken(TOKEN_AND_IF, NULL);
+            if(c2 == '&') return createToken(TOKEN_AND_IF, NULL, NULL);
             lex->lookahead = c2;
-            return createToken(TOKEN_BG, NULL);
+            return createToken(TOKEN_BG, NULL, NULL);
         // simple braces, !
         case '(':
-            return createToken(TOKEN_LPAREN, NULL);
+            return createToken(TOKEN_LPAREN, NULL, NULL);
         case ')':
-            return createToken(TOKEN_RPAREN, NULL);
+            return createToken(TOKEN_RPAREN, NULL, NULL);
         case '{':
-            return createToken(TOKEN_LBRACE, NULL);
+            return createToken(TOKEN_LBRACE, NULL, NULL);
         case '}':
-            return createToken(TOKEN_RBRACE, NULL);
+            return createToken(TOKEN_RBRACE, NULL, NULL);
         case '!':
-            return createToken(TOKEN_BANG, NULL);
+            return createToken(TOKEN_BANG, NULL, NULL);
         case '>':
         // >, >>, >&, >| (clobber)
             c2 = getCharacter(lex);
-            if(c2 == '>') return createToken(TOKEN_DGREAT, NULL);
-            if(c2 == '&') return createToken(TOKEN_GREATAND, NULL);
-            if(c2 == '|') return createToken(TOKEN_CLOBBER, NULL);
+            if(c2 == '>') return createToken(TOKEN_DGREAT, NULL, NULL);
+            if(c2 == '&') return createToken(TOKEN_GREATAND, NULL, NULL);
+            if(c2 == '|') return createToken(TOKEN_CLOBBER, NULL, NULL);
             lex->lookahead = c2;
-            return createToken(TOKEN_GREAT, NULL);
+            return createToken(TOKEN_GREAT, NULL, NULL);
         case '<':
-        // <, <<, <<<, <<-, <&, <>
+        // <, <<, <<<, <<-, <a&, <>
             c2 = getCharacter(lex);
             // handle <<, <<<, <<-
             if(c2 == '<') {
                 c3 = getCharacter(lex);
-                if(c3 == '<') return createToken(TOKEN_TLESS, NULL);
-                if(c3 == '-') return createToken(TOKEN_DLESSDASH, NULL);
+                if(c3 == '<') return createToken(TOKEN_TLESS, NULL, NULL);
+                if(c3 == '-') return createToken(TOKEN_DLESSDASH, NULL, NULL);
                 lex->lookahead = c3;
-                return createToken(TOKEN_DLESS, NULL);
+                return createToken(TOKEN_DLESS, NULL, NULL);
             }
             // handle <&, <>
-            if(c2 == '&') return createToken(TOKEN_LESSAND, NULL);
-            if(c2 == '>') return createToken(TOKEN_LESSGREAT, NULL);
+            if(c2 == '&') return createToken(TOKEN_LESSAND, NULL, NULL);
+            if(c2 == '>') return createToken(TOKEN_LESSGREAT, NULL, NULL);
             lex->lookahead = c2;
-            return createToken(TOKEN_LESS, NULL);
+            return createToken(TOKEN_LESS, NULL, NULL);
             // different word starts
         case '"': case '\'': case '\\':
             // word token starts
@@ -153,16 +155,12 @@ static Token handleStart(LexerPtr lex, int32_t c) {
                 stackPush(&lex->token_stack, (int8_t)STATE_DOUBLE_QUOTE);
             } else if(c == '\\') {
                 stackPush(&lex->token_stack, (int8_t)STATE_BACKSLASH);
-            } else {
-                if(!pushBuffer(lex, (char)c)) {
-                    return errorToken();
-                }
             }
             return nullToken();
         default:
             // regular word tokens, all word delimiters are handled above
             stackPush(&lex->token_stack, (int8_t)STATE_WORD);
-            if (!pushBuffer(lex, (char)c)) {
+            if (!pushBuffer(lex, (char)c, QUOTE_UNQUOTED)) {
                 return errorToken();
             }
             return nullToken();
@@ -174,7 +172,7 @@ static Token handleComment(LexerPtr lex, int32_t c) {
     // if its newlind ore end exit otherwise ignore
     if(c == '\n' || c == EOF) {
         stackPop(&lex->token_stack);
-        return c == EOF ? createToken(TOKEN_EOF, NULL) : createToken(TOKEN_NEWLINE, NULL);
+        return c == EOF ? createToken(TOKEN_EOF, NULL, NULL) : createToken(TOKEN_NEWLINE, NULL, NULL);
     }
     return nullToken();
 }
@@ -184,21 +182,31 @@ static Token handleWord(LexerPtr lex, int32_t c) {
     if(isWordDelimiter(c)) {
         lex->lookahead = c;
         stackPop(&lex->token_stack);  /* pop WORD */
-        lex->buffer[lex->buffer_pos] = '\0';
-        char* word = strdup(lex->buffer);
+        lex->char_buffer[lex->buffer_pos] = '\0';
+        char* word = strdup(lex->char_buffer);
         if(word == NULL) {
             return errorToken();
+        }
+
+        int8_t* quotes = NULL;
+        if(lex->buffer_pos > 0) {
+            quotes = malloc(lex->buffer_pos);
+            if(quotes == NULL) {
+                free(word);
+                return errorToken();
+            }
+            memcpy(quotes, lex->type_buffer, lex->buffer_pos);
         }
 
         if(c == '<' || c == '>') {
             for(int i = 0; i < lex->buffer_pos; i++) {
                 if(word[i] < '0' || word[i] > '9') {
-                    return createToken(TOKEN_WORD, word); // word
+                    return createToken(TOKEN_WORD, word, quotes); // word
                 }
             }
-            return createToken(TOKEN_IO_NUM, word); // io
+            return createToken(TOKEN_IO_NUM, word, NULL); // io
         }
-        return createToken(TOKEN_WORD, word); // word
+        return createToken(TOKEN_WORD, word, quotes); // word
     }
 
     if(c == '\'') {
@@ -208,7 +216,7 @@ static Token handleWord(LexerPtr lex, int32_t c) {
     } else if(c == '\\') {
         stackPush(&lex->token_stack, (int8_t)STATE_BACKSLASH);
     } else {
-        if (!pushBuffer(lex, (char)c)) {
+        if (!pushBuffer(lex, (char)c, QUOTE_UNQUOTED)) {
              return errorToken();
         }
     }
@@ -228,7 +236,7 @@ static Token handleBackslash(LexerPtr lex, int32_t c) {
         return nullToken();
     }
     // push token
-    if(!pushBuffer(lex, (char)c)) {
+    if(!pushBuffer(lex, (char)c, QUOTE_ESCAPED)) {
         return errorToken();
     }
     // pop state
@@ -244,7 +252,7 @@ static Token handleSingleQuote(LexerPtr lex, int32_t c) {
     }
 
     if (c != '\'') {
-        if(!pushBuffer(lex, (char)c)) {
+        if(!pushBuffer(lex, (char)c, QUOTE_SINGLE_QUOTED)) {
             return errorToken();
         } 
     } else {
@@ -264,7 +272,7 @@ static Token handleDoubleQuote(LexerPtr lex, int32_t c) {
     } else if(c == '\\') {
         stackPush(&lex->token_stack, (int8_t)STATE_DQ_BACKSLASH);
     } else {
-        if (!pushBuffer(lex, (char)c)) {
+        if (!pushBuffer(lex, (char)c, QUOTE_DOUBLE_QUOTED)) {
             return errorToken();
         }
     }
@@ -284,11 +292,14 @@ static Token handleDQBackslash(LexerPtr lex, int32_t c) {
     }
     // escaped characters based on POSIX
     if(c != '"' && c != '\\' && c != '$' && c != '`') {
-        if(!pushBuffer(lex, '\\')) {
+        if(!pushBuffer(lex, '\\', QUOTE_DOUBLE_QUOTED)) {
+            return errorToken();
+        }
+        if(!pushBuffer(lex, (char)c, QUOTE_DOUBLE_QUOTED)) { 
             return errorToken();
         }
     }
-    if(!pushBuffer(lex, (char)c)) { 
+    if(!pushBuffer(lex, (char)c, QUOTE_ESCAPED)) { 
         return errorToken();
     }
     stackPop(&lex->token_stack);
@@ -324,7 +335,7 @@ Token getToken(LexerPtr lex) {
     }
 
     lex->buffer_pos = 0; // reset buffer
-    lex->buffer[0] = '\0';
+    lex->char_buffer[0] = '\0';
     int32_t c;
     int8_t state_val;
     Token t = nullToken();
@@ -373,6 +384,11 @@ void tokenFree(TokenPtr tok) {
         free(tok->value);
         tok->value = NULL;
     }
+
+    if(tok->char_types) {
+        free(tok->char_types);
+        tok->char_types = NULL;
+    }
 }
 
 void lexerReset(LexerPtr lex, FILE* input) {
@@ -386,7 +402,7 @@ void lexerReset(LexerPtr lex, FILE* input) {
 
     // reset buffer and line number
     lex->buffer_pos = 0;
-    lex->buffer[0] = '\0';
+    lex->char_buffer[0] = '\0';
     lex->line = 1;
     lex->lookahead = -1;
 

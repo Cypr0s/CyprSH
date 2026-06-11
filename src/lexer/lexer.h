@@ -61,9 +61,17 @@ typedef enum {
     TOKEN_NULL,          // for uninitialized tokens
 } TokenTypeEnum;
 
+typedef enum {
+    QUOTE_UNQUOTED = 0,
+    QUOTE_SINGLE_QUOTED = 1,
+    QUOTE_DOUBLE_QUOTED = 2,
+    QUOTE_ESCAPED = 3,
+} QuoteTypeEnum;
+
 typedef struct {
     TokenTypeEnum type;
     char* value;  // heap-allocated for WORD/IO_NUM; NULL for all others
+    int8_t* char_types;
 } Token, *TokenPtr;
 
 typedef struct {
@@ -71,7 +79,8 @@ typedef struct {
     Stack token_stack;       // stack for storing FSM states
     int32_t line;            // current line number 
     int32_t lookahead;       // one-char buffer (-1 = none)
-    char buffer[MAX_TOKEN_LENGTH];
+    char char_buffer[MAX_TOKEN_LENGTH];
+    int8_t type_buffer[MAX_TOKEN_LENGTH];
     int16_t buffer_pos;
 } Lexer, *LexerPtr;
 
