@@ -13,7 +13,7 @@ typedef struct {
     int8_t top;  // -1 = empty
 } Stack, *StackPtr;
 
-StatusEnum stackInit(StackPtr stack);
+StatusEnum stackCtor(StackPtr stack);
 StatusEnum stackPush(StackPtr stack, int8_t value);
 StatusEnum stackPop(StackPtr stack);
 StatusEnum stackTop(StackPtr stack, int8_t* out);

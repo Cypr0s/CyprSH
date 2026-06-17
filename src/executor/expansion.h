@@ -3,6 +3,9 @@
 #include "data_structures/stack.h"
 #include "data_structures/char_buffer.h"
 
+#define DEFAULT_OUTPUT_SIZE 32
+#define DEFAULT_NAME_SIZE 8
+
 typedef enum {
     EXP_NORMAL, // unqoted chars
     EXP_TILDE, // ~

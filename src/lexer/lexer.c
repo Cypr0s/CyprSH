@@ -313,7 +313,7 @@ StatusEnum lexerCtor(LexerPtr lex, FILE* input) {
     lex->line = 1;
     lex->lookahead = -1;
     lex->buffer_pos = 0;
-    if(stackInit(&lex->token_stack) != SUCCESS) { 
+    if(stackCtor(&lex->token_stack) != SUCCESS) { 
         return ERROR_DEFAULT;
     }
     stackPush(&lex->token_stack, (int8_t)STATE_START);

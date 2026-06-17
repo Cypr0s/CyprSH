@@ -1,6 +1,6 @@
 #include "data_structures/stack.h"
 
-StatusEnum stackInit(StackPtr stack) {
+StatusEnum stackCtor(StackPtr stack) {
     if (stack == NULL) {
         fprintf(stderr, "stackInit: NULL pointer\n");
         return ERROR_DEFAULT;
