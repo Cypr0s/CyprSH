@@ -9,7 +9,7 @@ StatusEnum builtinCd(int16_t argc, char** argv, ExecuteEnvironmentPtr env) {
     if(argc < 2) {
         hashTableGetValue(env->env_table, "HOME", &target);
         if(target == NULL) {
-            fprintf(stderr, "CyprSH: cd: HOME not set\n");
+            printError("cd", "HOME not set");
             env->last_exec_status = 1;
             return SUCCESS;
         }
@@ -17,7 +17,7 @@ StatusEnum builtinCd(int16_t argc, char** argv, ExecuteEnvironmentPtr env) {
     } else if(streq(argv[1], "-")) {
         hashTableGetValue(env->env_table, "OLDPWD", &target);
         if(target == NULL) {
-            fprintf(stderr, "CyprSH: cd: OLDPWD not set\n");
+            printError("cd", "OLDPWD not set");
             env->last_exec_status = 1;
             return SUCCESS;
         }
@@ -35,7 +35,7 @@ StatusEnum builtinCd(int16_t argc, char** argv, ExecuteEnvironmentPtr env) {
 
     // perform the change
     if(chdir(target) == -1) {
-        fprintf(stderr, "CyprSH: cd: %s: %s\n", target, strerror(errno));
+        printError("cd", "%s: %s", target, strerror(errno));
         env->last_exec_status = 1;
         return SUCCESS;
     }

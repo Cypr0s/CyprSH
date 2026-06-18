@@ -27,7 +27,7 @@ StatusEnum builtinExport(int16_t argc, char** argv, ExecuteEnvironmentPtr env) {
         free(key);
         free(value);
         if(st != SUCCESS) {
-            fprintf(stderr, "CyprSH: export: failed to set '%s'\n", argv[i]);
+            printError("export", "failed to set '%s'", argv[i]);
             env->last_exec_status = 1;
             return SUCCESS;
         }

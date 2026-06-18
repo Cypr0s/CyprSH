@@ -3,7 +3,7 @@
 
 StatusEnum builtinExit(int16_t argc, char** argv, ExecuteEnvironmentPtr env) {
     if(argc > 2) {
-        fprintf(stderr, "CyprSH: exit: too many arguments\n");
+        printError("exit", "too many arguments");
         env->last_exec_status = 1;
         return SUCCESS;
     }
@@ -13,7 +13,7 @@ StatusEnum builtinExit(int16_t argc, char** argv, ExecuteEnvironmentPtr env) {
         char* endptr;
         long val = strtol(argv[1], &endptr, 10);
         if(*endptr != '\0') {
-            fprintf(stderr, "CyprSH: exit: %s: numeric argument required\n", argv[1]);
+            printError("exit", "%s: numeric argument required", argv[1]);
             env->last_exec_status = 2; // posix misuse
         } else {
             env->last_exec_status = (uint8_t)(val & 255);  // mod 256

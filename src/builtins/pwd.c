@@ -7,7 +7,7 @@ StatusEnum builtinPwd(int16_t argc __attribute__((unused)),
     char cwd[PATH_MAX];
 
     if(getcwd(cwd, sizeof(cwd)) == NULL) {
-        fprintf(stderr, "CyprSH: pwd: %s\n", strerror(errno));
+        printError("pwd", "%s", strerror(errno));
         env->last_exec_status = 1;
         return SUCCESS;
     }
