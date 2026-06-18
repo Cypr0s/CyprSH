@@ -12,4 +12,6 @@
 
 StatusEnum executeNode(ASTNodePtr node, ExecuteEnvironmentPtr env);
 
+void executorCtor(ExecuteEnvironmentPtr env, HashTablePtr p_env);
+
 #endif // EXECUTE_H

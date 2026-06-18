@@ -599,3 +599,9 @@ static StatusEnum executeSimpleCommandNode(ASTNodePtr command_node, ExecuteEnvir
     
     return SUCCESS;
 }
+
+void executorCtor(ExecuteEnvironmentPtr env, HashTablePtr p_env) {
+   env->env_table = p_env;
+   env->last_exec_status = 0;
+   env->flags = EXEC_FLAG_NONE;
+}

@@ -4,30 +4,51 @@
 
 int32_t main(int32_t argc, char **argv) {
     extern char **environ;
-    int32_t file_descriptor = STDIN_FILENO;
-    if(argc == 2) {
-        openFile(argv[1], O_RDONLY, &file_descriptor);
-    }
 
+    // create env table
     HashTable env_table;
     populateEnvTable(&env_table, environ);
 
-    runShell(file_descriptor, &env_table);
+    StatusEnum st = SUCCESS;
+
+    // choose run mode / script / string / interactive / pipe
+    if(argc >= 3 && streq(argv[1], "-c")) {
+        st = runString(argv[2], &env_table);
+    } else if(argc == 2) {
+        int32_t fd = STDIN_FILENO;
+        st = openFile(argv[1], O_RDONLY, &fd);
+
+        if(st != SUCCESS) {
+            hashTableDtor(&env_table);
+            return st;
+        }
+
+        FILE* input = fdopen(fd, "r"); // create file from fd
+        if(input == NULL) {
+            printError("main", "Cannot open file: %s", argv[1]);
+            close(fd);
+            hashTableDtor(&env_table);
+            return 1;
+        }
+        st = runScript(input, &env_table);
+        fclose(input);
+
+    } else if(isatty(STDIN_FILENO)) {
+        // interactive mode
+        st = runInteractive(&env_table);
+    } else {
+        // pipe/stdin mode: echo "ls" | ./cyprsh
+        st = runScript(stdin, &env_table);
+    }
+
 
     hashTableDtor(&env_table);
-    if(file_descriptor != STDIN_FILENO) {
-        close(file_descriptor);
-    }
     return 0;
 }
 
-// will need revorking AI generated slop
-StatusEnum runShell(int32_t file_descriptor, HashTablePtr env_table) {
-    if(!isatty(file_descriptor)) {
-        // TODO: script mode
-        return SUCCESS;
-    }
 
+StatusEnum runInteractive(HashTablePtr env_table) {
+    // loading history
     char history_path[PATH_MAX] = {0};
     char* home = getenv("HOME");
     if(home != NULL) {
@@ -40,27 +61,24 @@ StatusEnum runShell(int32_t file_descriptor, HashTablePtr env_table) {
     using_history();
     read_history(history_path);
 
-    // build the execution environment once — reused for every command
-    ExecuteEnvironment env = {
-        .env_table = env_table,
-        .flags = EXEC_FLAG_NONE,
-        .last_exec_status = 0,
-    };
+    // prepare analyzing/ executing structures
+    ExecuteEnvironment env;
+    executorCtor(&env, env_table);
 
-    // lexer and parser created once, reused via reset
     Lexer lexer;
     Parser parser;
     lexerCtor(&lexer, NULL);
     parserCtor(&parser, &lexer);
 
     while(1) {
+        // getting line
         char* line = readline("cyprSH> ");
         if(line == NULL) break;  // EOF (Ctrl+D)
         if(*line == '\0') {
             free(line);
             continue;
         }
-
+        
         add_history(line);
 
         FILE* input = fmemopen(line, strlen(line), "r");
@@ -78,13 +96,16 @@ StatusEnum runShell(int32_t file_descriptor, HashTablePtr env_table) {
             continue;
         }
 
+        // analysis
         StatusEnum st = analyze(&parser, ast_root);
-        if(st == SUCCESS) {
-            #ifdef DEBUG
-            printAST(ast_root, 0);
-            #endif
-            executeNode(ast_root, &env);
+        if(st != SUCCESS) {
+            free(line);
+            ASTFreeTree(ast_root);
+            continue;
         }
+
+        // execution
+        executeNode(ast_root, &env);
 
         ASTFreeTree(ast_root);
         free(line);
@@ -93,61 +114,58 @@ StatusEnum runShell(int32_t file_descriptor, HashTablePtr env_table) {
         }
     }
 
-
+    // cleanup
     write_history(history_path);
-
     parserDtor(&parser);
     lexerDtor(&lexer);
     return SUCCESS;
 }
 
 
-// ai slop
-void printAST(ASTNodePtr node, int depth) {
-    if(!node) return;
+StatusEnum runScript(FILE* input, HashTablePtr env_table) {
+    ExecuteEnvironment env;
+    executorCtor(&env, env_table);
 
-    // indent
-    for(int i = 0; i < depth; i++) fprintf(stderr, "  ");
+    Lexer lexer;
+    Parser parser;
+    lexerCtor(&lexer, input);
+    parserCtor(&parser, &lexer);
+    parserReset(&parser);
 
-    // node type name
-    const char* type_names[] = {
-        [NODE_PROGRAM]          = "PROGRAM",
-        [NODE_COMPLETE_COMMAND] = "COMPLETE_COMMAND",
-        [NODE_LIST]             = "LIST",
-        [NODE_AND_OR]           = "AND_OR",
-        [NODE_PIPELINE]         = "PIPELINE",
-        [NODE_SIMPLE_COMMAND]   = "SIMPLE_COMMAND",
-        [NODE_CMD_PREFIX]       = "CMD_PREFIX",
-        [NODE_CMD_WORD]         = "CMD_WORD",
-        [NODE_CMD_SUFFIX]       = "CMD_SUFFIX",
-        [NODE_REDIRECT]         = "REDIRECT",
-        [NODE_ASSIGNMENT_WORD]  = "ASSIGNMENT_WORD",
-        [NODE_WORD]             = "WORD",
-        [NODE_IO_NUM]           = "IO_NUM",
-        [NODE_SUBSHELL]         = "SUBSHELL",
-        [NODE_BRACE_GROUP]      = "BRACE_GROUP",
-        [NODE_IF_CLAUSE]        = "IF_CLAUSE",
-        [NODE_ELSE_CLAUSE]      = "ELSE_CLAUSE",
-        [NODE_WHILE_CLAUSE]     = "WHILE_CLAUSE",
-        [NODE_UNTIL_CLAUSE]     = "UNTIL_CLAUSE",
-        [NODE_FOR_CLAUSE]       = "FOR_CLAUSE",
-        [NODE_CASE_CLAUSE]      = "CASE_CLAUSE",
-        [NODE_CASE_ITEM]        = "CASE_ITEM",
-        [NODE_FUNCTION_DEF]     = "FUNCTION_DEF"
-    };
-
-    fprintf(stderr, "[%s]", type_names[node->type]);
-
-    // value if present
-    if(node->value) fprintf(stderr, " value='%s'", node->value);
-
-    // flags if set
-    if(node->flags) fprintf(stderr, " flags=%d", node->flags);
-
-    fprintf(stderr, "\n");
-
-    // recurse into children
-    for(int i = 0; i < node->num_children; i++) {
-        printAST(node->children[i], depth + 1);
+    ASTNodePtr ast_root = ASTNodeCtor(NODE_PROGRAM, NULL, NULL);
+    if(ast_root == NULL) {
+        parserDtor(&parser);
+        lexerDtor(&lexer);
+        return ERROR_MALLOC_FAILURE;
     }
+
+    // analysis
+    StatusEnum st = analyze(&parser, ast_root);
+    if(st != SUCCESS) {
+        parserDtor(&parser);
+        lexerDtor(&lexer);
+        ASTFreeTree(ast_root);
+        return st;
+    }
+
+    // execution
+    executeNode(ast_root, &env);
+
+    ASTFreeTree(ast_root);
+    parserDtor(&parser);
+    lexerDtor(&lexer);
+    return SUCCESS;
+}
+
+
+StatusEnum runString(char* string_input, HashTablePtr env_table) {
+    FILE* input = fmemopen(string_input, strlen(string_input), "r");
+    if(input == NULL) {
+        printError("runString", "fmemopen failed");
+        return ERROR_DEFAULT;
+    }
+
+    StatusEnum st = runScript(input, env_table);
+    fclose(input);
+    return st;
 }

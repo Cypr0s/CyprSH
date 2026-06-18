@@ -11,7 +11,11 @@
 
 #define HISTORY_FILE_NAME "CyprSH_history"
 
-StatusEnum runShell(int32_t file_descriptor, HashTablePtr env_table);
+StatusEnum runInteractive(HashTablePtr env_table);
+
+StatusEnum runScript(FILE* input, HashTablePtr env_table);
+
+StatusEnum runString(char* string_input, HashTablePtr env_table);
 
 void printAST(ASTNodePtr node, int depth);
 
