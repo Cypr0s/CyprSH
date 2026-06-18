@@ -6,14 +6,15 @@ static const char* COMPOUND_END_KEYWORDS[] = {
     "do", "done", "esac", NULL
 };
 
-static void advanceTokens(ParserPtr parser);
-static ASTNodePtr createAndInsert(ASTNodePtr parent, NodeTypeEnum type, char* value, int8_t* value_types);
+static StatusEnum advanceTokens(ParserPtr parser);
+static ASTNodePtr createAndInsertEmpty(ASTNodePtr parent, NodeTypeEnum type);
+static ASTNodePtr createAndInsertFromToken(ASTNodePtr parent, NodeTypeEnum type, TokenPtr token);
 static uint8_t isRedirectOperator(TokenTypeEnum type);
 static int32_t tokenToRedirectType(TokenTypeEnum type);
 static uint8_t isAssignmentWord(const char* word);
 
 // recursive descent parsing functions
-static void analyzeLineBreak(ParserPtr parser);
+static StatusEnum analyzeLineBreak(ParserPtr parser);
 static StatusEnum analyzeNewline(ParserPtr parser);
 
 static StatusEnum analyzeProgram(ParserPtr parser, ASTNodePtr ast_root);
@@ -42,25 +43,61 @@ static StatusEnum analyzeFunctionDef(ParserPtr parser, ASTNodePtr pipeline);
 static StatusEnum analyzeCompoundCommand(ParserPtr parser, ASTNodePtr parent);
 
 
-static void advanceTokens(ParserPtr parser) {
+static StatusEnum advanceTokens(ParserPtr parser) {
     tokenFree(&parser->current_token);
     parser->current_token = parser->peek_token;
     parser->peek_token = getToken(parser->lexer);
+ 
+    return parser->current_token.error_type;
 }
 
 
-static ASTNodePtr createAndInsert(ASTNodePtr parent, NodeTypeEnum type, char* value, int8_t* value_types) {
-    ASTNodePtr node = ASTNodeCtor(type, value, value_types);
+static ASTNodePtr createAndInsertEmpty(ASTNodePtr parent, NodeTypeEnum type) {
+    if(parent == NULL) {
+        printError("createAndInsertEmpty", "Passing NULL pointer");
+        return NULL;
+    }
+ 
+    ASTNodePtr node = ASTNodeCtor(type, NULL, NULL);
     if(node == NULL) {
         return NULL;
     }
-
+ 
     if(ASTaddChild(parent, node) != SUCCESS) {
         ASTNodeDtor(node);
         return NULL;
     }
+ 
     return node;
 }
+ 
+
+static ASTNodePtr createAndInsertFromToken(ASTNodePtr parent, NodeTypeEnum type, TokenPtr token) {
+    if(parent == NULL || token == NULL) {
+        printError("createAndInsertFromToken", "Passing NULL pointer");
+        return NULL;
+    }
+ 
+    ASTNodePtr node = ASTNodeCtor(type, token->value, token->char_types);
+    if(node == NULL) {
+        return NULL;
+    }
+ 
+    if(ASTaddChild(parent, node) != SUCCESS) {
+        // ASTaddChild failed — prevent ASTNodeDtor from freeing token's memory
+        node->value = NULL;
+        node->value_types = NULL;
+        ASTNodeDtor(node);
+        return NULL;
+    }
+ 
+    // Transfer complete — token no longer owns these pointers
+    token->value = NULL;
+    token->char_types = NULL;
+ 
+    return node;
+}
+
 
 static uint8_t isRedirectOperator(TokenTypeEnum type) {
     switch(type) {
@@ -80,6 +117,7 @@ static uint8_t isRedirectOperator(TokenTypeEnum type) {
     }
 }
 
+
 static int32_t tokenToRedirectType(TokenTypeEnum type) {
     switch(type) {
         case TOKEN_LESS:      return REDIR_LESS;
@@ -95,6 +133,7 @@ static int32_t tokenToRedirectType(TokenTypeEnum type) {
         default:              return REDIR_NONE;
     }
 }
+
 
 static uint8_t isCompoundListEnd(Token t) {
     if(t.type == TOKEN_EOF)    return 1U;
@@ -133,22 +172,34 @@ static uint8_t isAssignmentWord(const char* word) {
 }
 
 
-static void analyzeLineBreak(ParserPtr parser) {
+static StatusEnum analyzeLineBreak(ParserPtr parser) {
     while(parser->current_token.type == TOKEN_NEWLINE) {
-        advanceTokens(parser);
+        StatusEnum st = advanceTokens(parser);
+        if(st != SUCCESS) {
+            return st;
+        }
     }
+    return SUCCESS;
 }
 
 static StatusEnum analyzeNewline(ParserPtr parser) {
     if(parser->current_token.type != TOKEN_NEWLINE) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected newline, got '%s'\n", parser->lexer->line, parser->current_token.value);
-        return ERROR_SHELL_MISUSE;
+        printError("analyzeNewline", 
+                    "Syntax error at line %d, expected `\\n`", 
+                    parser->lexer->line
+                );
+        return ERROR_SYNTAX_ERROR;
     }
+
     while(parser->current_token.type == TOKEN_NEWLINE) {
-        advanceTokens(parser);
+        StatusEnum st = advanceTokens(parser);
+        if(st != SUCCESS) {
+            return st;
+        }
     }
     return SUCCESS;
 }
+
 
 static StatusEnum analyzeProgram(ParserPtr parser, ASTNodePtr ast_root) {
     // program -> newline complete_command newline EOF
@@ -158,7 +209,10 @@ static StatusEnum analyzeProgram(ParserPtr parser, ASTNodePtr ast_root) {
     }
 
     // creat command node
-    ASTNodePtr complete_command_node = createAndInsert(ast_root, NODE_COMPLETE_COMMAND, NULL, NULL);
+    ASTNodePtr complete_command_node = createAndInsert(ast_root, 
+                                                        NODE_COMPLETE_COMMAND,
+                                                        &(parser->current_token)
+                                                    );
     if(complete_command_node == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -176,8 +230,11 @@ static StatusEnum analyzeProgram(ParserPtr parser, ASTNodePtr ast_root) {
             break;
         }
 
-        // creat command node
-        ASTNodePtr complete_command_node = createAndInsert(ast_root, NODE_COMPLETE_COMMAND, NULL, NULL);
+        // create command node
+        ASTNodePtr complete_command_node = createAndInsert(ast_root, 
+                                                            NODE_COMPLETE_COMMAND, 
+                                                            &(parser->current_token)
+                                                        );
         if(complete_command_node == NULL) {
             return ERROR_MALLOC_FAILURE;
         }
@@ -261,7 +318,9 @@ static StatusEnum analyzeAndOr(ParserPtr parser, ASTNodePtr list) {
         return st; 
     }
 
-    while(parser->current_token.type == TOKEN_AND_IF || parser->current_token.type == TOKEN_OR_IF) {
+    while(parser->current_token.type == TOKEN_AND_IF || 
+            parser->current_token.type == TOKEN_OR_IF) 
+        {
 
         // operator follows the last pipeline — flag it
         ASTNodePtr last = and_or->children[and_or->num_children - 1];
@@ -344,16 +403,21 @@ StatusEnum analyzeCommand(ParserPtr parser, ASTNodePtr pipeline) {
 
 
 static StatusEnum analyzeSimpleCommand(ParserPtr parser, ASTNodePtr pipeline) {
-    ASTNodePtr command = createAndInsert(pipeline, NODE_SIMPLE_COMMAND, NULL, NULL);
+    ASTNodePtr command = createAndInsert(pipeline, NODE_SIMPLE_COMMAND, &(parser->current_token));
     if(command == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
 
     // cmd prefix, !todo TOKEN_IO_LOCATION!
-    if((parser->current_token.type == TOKEN_WORD && isAssignmentWord(parser->current_token.value)) ||
+    if((parser->current_token.type == TOKEN_WORD && 
+        isAssignmentWord(parser->current_token.value)) ||
         parser->current_token.type == TOKEN_IO_NUM || 
-        isRedirectOperator(parser->current_token.type)) {
-        ASTNodePtr cmd_prefix = createAndInsert(command, NODE_CMD_PREFIX, NULL, NULL);
+        isRedirectOperator(parser->current_token.type)) 
+    {
+        ASTNodePtr cmd_prefix = createAndInsert(command,
+                                                NODE_CMD_PREFIX,
+                                                &(parser->current_token)
+                                            );
         if(cmd_prefix == NULL) {
             return ERROR_MALLOC_FAILURE;
         }
@@ -364,7 +428,7 @@ static StatusEnum analyzeSimpleCommand(ParserPtr parser, ASTNodePtr pipeline) {
 
     // cmd word
     if(parser->current_token.type == TOKEN_WORD) {
-        ASTNodePtr cmd_word = createAndInsert(command, NODE_CMD_WORD, parser->current_token.value, parser->current_token.char_types);
+        ASTNodePtr cmd_word = createAndInsert(command, NODE_CMD_WORD, &(parser->current_token));
         if(cmd_word == NULL) {
             return ERROR_MALLOC_FAILURE;
         }
@@ -376,7 +440,10 @@ static StatusEnum analyzeSimpleCommand(ParserPtr parser, ASTNodePtr pipeline) {
            isRedirectOperator(parser->current_token.type)) 
         {
 
-            ASTNodePtr cmd_suffix = createAndInsert(command, NODE_CMD_SUFFIX, NULL, NULL);
+            ASTNodePtr cmd_suffix = createAndInsert(command,
+                                                    NODE_CMD_SUFFIX,
+                                                    &(parser->current_token)
+                                                );
             if(!cmd_suffix) { 
                 return ERROR_MALLOC_FAILURE;
             }
@@ -396,15 +463,19 @@ static StatusEnum analyzeSimpleCommand(ParserPtr parser, ASTNodePtr pipeline) {
 
 
 static StatusEnum analyzeCmdPrefix(ParserPtr parser, ASTNodePtr cmd_prefix) {
-    while((parser->current_token.type == TOKEN_WORD && isAssignmentWord(parser->current_token.value)) ||
-           parser->current_token.type == TOKEN_IO_NUM || 
-           isRedirectOperator(parser->current_token.type)) 
+    while((parser->current_token.type == TOKEN_WORD && 
+            isAssignmentWord(parser->current_token.value)) ||
+            parser->current_token.type == TOKEN_IO_NUM || 
+            isRedirectOperator(parser->current_token.type)) 
     {
         // assignment word
         if(parser->current_token.type == TOKEN_WORD && 
             isAssignmentWord(parser->current_token.value)) 
         {
-            ASTNodePtr assign = createAndInsert(cmd_prefix, NODE_ASSIGNMENT_WORD, parser->current_token.value, parser->current_token.char_types);
+            ASTNodePtr assign = createAndInsert(cmd_prefix, 
+                                                NODE_ASSIGNMENT_WORD,
+                                                &(parser->current_token)
+                                            );
     
             if(assign == NULL) {
                  return ERROR_MALLOC_FAILURE;
@@ -421,14 +492,14 @@ static StatusEnum analyzeCmdPrefix(ParserPtr parser, ASTNodePtr cmd_prefix) {
 
 
 static StatusEnum analyzeRedirect(ParserPtr parser, ASTNodePtr cmd_prefix) {
-    ASTNodePtr redirect = createAndInsert(cmd_prefix, NODE_REDIRECT, NULL, NULL);
+    ASTNodePtr redirect = createAndInsert(cmd_prefix, NODE_REDIRECT, &(parser->current_token));
     if(redirect == NULL) { 
         return ERROR_MALLOC_FAILURE;
     }
 
     // optional IO_NUM
     if(parser->current_token.type == TOKEN_IO_NUM) {
-        ASTNodePtr io_num = createAndInsert(redirect, NODE_IO_NUM, parser->current_token.value, NULL);
+        ASTNodePtr io_num = createAndInsert(redirect, NODE_IO_NUM, &(parser->current_token));
         if(io_num == NULL) {
             return ERROR_MALLOC_FAILURE;
         }
@@ -437,7 +508,10 @@ static StatusEnum analyzeRedirect(ParserPtr parser, ASTNodePtr cmd_prefix) {
 
     // operator
     if(!isRedirectOperator(parser->current_token.type)) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected redirect operator\n", parser->lexer->line);
+        printError("analyzeRedirect", 
+                    "Syntax error at line %d, expected `redirect operator`", 
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
     redirect->flags = tokenToRedirectType(parser->current_token.type);
@@ -445,10 +519,13 @@ static StatusEnum analyzeRedirect(ParserPtr parser, ASTNodePtr cmd_prefix) {
 
     // filename or delimiter as second child
     if(parser->current_token.type != TOKEN_WORD) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected redirect target\n", parser->lexer->line);
+        printError("analyzeRedirect", 
+                "Syntax error at line %d, expected `redirect target`", 
+                parser->lexer->line
+            );
         return ERROR_SYNTAX_ERROR;
     }
-    ASTNodePtr word = createAndInsert(redirect, NODE_WORD, parser->current_token.value, parser->current_token.char_types);
+    ASTNodePtr word = createAndInsert(redirect, NODE_WORD, &(parser->current_token));
     if(word == NULL) { 
         return ERROR_MALLOC_FAILURE; 
     }
@@ -464,12 +541,14 @@ static StatusEnum analyzeCmdSuffix(ParserPtr parser, ASTNodePtr cmd_suffix) {
           isRedirectOperator(parser->current_token.type)) 
     {
         if(parser->current_token.type == TOKEN_WORD) {
-            ASTNodePtr word = createAndInsert(cmd_suffix, NODE_WORD, parser->current_token.value, parser->current_token.char_types);
+            ASTNodePtr word = createAndInsert(cmd_suffix, NODE_WORD, &(parser->current_token));
             if(word == NULL) { 
                 return ERROR_MALLOC_FAILURE; 
             }
             advanceTokens(parser);
-        } else if(parser->current_token.type == TOKEN_IO_NUM || isRedirectOperator(parser->current_token.type)) {
+        } else if(parser->current_token.type == TOKEN_IO_NUM || 
+                    isRedirectOperator(parser->current_token.type)) 
+        {
             StatusEnum st = analyzeRedirect(parser, cmd_suffix);
             ERR_CHECK(st);
         }
@@ -480,14 +559,17 @@ static StatusEnum analyzeCmdSuffix(ParserPtr parser, ASTNodePtr cmd_suffix) {
 
 static StatusEnum analyzeSubshell(ParserPtr parser, ASTNodePtr pipeline) {
     // create subshell node
-    ASTNodePtr subshell = createAndInsert(pipeline, NODE_SUBSHELL, NULL, NULL);
+    ASTNodePtr subshell = createAndInsert(pipeline, NODE_SUBSHELL, &(parser->current_token));
     if(subshell == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
 
     // expect LPAREN
     if(parser->current_token.type != TOKEN_LPAREN) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected '('\n", parser->lexer->line);
+        printError("analyzeSubshell", 
+                    "Syntax error at line %d: expected `(`",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
     advanceTokens(parser);
@@ -498,7 +580,10 @@ static StatusEnum analyzeSubshell(ParserPtr parser, ASTNodePtr pipeline) {
 
     // expect RPAREN
     if(parser->current_token.type != TOKEN_RPAREN) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected ')'\n", parser->lexer->line);
+        printError("analyzeSubshell", 
+                    "Syntax error at line %d: expected `)`", 
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
 
@@ -573,14 +658,17 @@ static StatusEnum analyzeTerm(ParserPtr parser, ASTNodePtr compound_node) {
 
 static StatusEnum analyzeBraceGroup(ParserPtr parser, ASTNodePtr pipeline) {
     // create group node
-    ASTNodePtr group = createAndInsert(pipeline, NODE_BRACE_GROUP, NULL, NULL);
+    ASTNodePtr group = createAndInsert(pipeline, NODE_BRACE_GROUP, &(parser->current_token));
     if(group == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
 
     // expect LBRACE
     if(parser->current_token.type != TOKEN_LBRACE) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected '{'\n", parser->lexer->line);
+        printError("analyzeBraceGroup",
+                    "CyprSH: Syntax error at line %d: expected '{'",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
     advanceTokens(parser);
@@ -591,7 +679,10 @@ static StatusEnum analyzeBraceGroup(ParserPtr parser, ASTNodePtr pipeline) {
 
     // expect RBRACE
     if(parser->current_token.type != TOKEN_RBRACE) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected '}'\n", parser->lexer->line);
+        printError("analyzeBraceGroup",
+                    "CyprSH: Syntax error at line %d: expected '}'",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
 
@@ -602,13 +693,16 @@ static StatusEnum analyzeBraceGroup(ParserPtr parser, ASTNodePtr pipeline) {
 
 static StatusEnum analyzeIfClause(ParserPtr parser, ASTNodePtr pipeline) {
     // create if node
-    ASTNodePtr if_clause = createAndInsert(pipeline, NODE_IF_CLAUSE, NULL, NULL);
+    ASTNodePtr if_clause = createAndInsert(pipeline, NODE_IF_CLAUSE, &(parser->current_token));
     if(if_clause == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
 
     if(!streq(parser->current_token.value, "if")) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected 'if'\n", parser->lexer->line);
+        printError("analyzeIfClause", 
+                    "Syntax error at line %d: expected `if`",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
     advanceTokens(parser);
@@ -617,7 +711,10 @@ static StatusEnum analyzeIfClause(ParserPtr parser, ASTNodePtr pipeline) {
     ERR_CHECK(st);
 
     if(!streq(parser->current_token.value, "then")) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected 'then'\n", parser->lexer->line);
+        printError("analyzeIfClause", 
+                    "Syntax error at line %d: expected `then`",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
     advanceTokens(parser);
@@ -630,7 +727,10 @@ static StatusEnum analyzeIfClause(ParserPtr parser, ASTNodePtr pipeline) {
     }
 
     if(!streq(parser->current_token.value, "fi")) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected 'fi'\n", parser->lexer->line);
+        printError("analyzeIfClause", 
+                    "Syntax error at line %d: expected `fi`",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
     advanceTokens(parser);
@@ -642,20 +742,29 @@ static StatusEnum analyzeIfClause(ParserPtr parser, ASTNodePtr pipeline) {
 static StatusEnum analyzeElsePart(ParserPtr parser, ASTNodePtr if_clause) {
     if(streq(parser->current_token.value, "else")) {
         advanceTokens(parser);
-        ASTNodePtr else_clause = createAndInsert(if_clause, NODE_ELSE_CLAUSE, NULL, NULL);
+        ASTNodePtr else_clause = createAndInsert(if_clause, 
+                                                NODE_ELSE_CLAUSE, 
+                                                &(parser->current_token)
+                                            );
         StatusEnum st = analyzeCompoundList(parser, else_clause);
         ERR_CHECK(st);
     } else if(streq(parser->current_token.value, "elif")) {
         advanceTokens(parser);
 
-        ASTNodePtr elif_clause = createAndInsert(if_clause, NODE_IF_CLAUSE, NULL, NULL);
+        ASTNodePtr elif_clause = createAndInsert(if_clause, 
+                                                NODE_IF_CLAUSE, 
+                                                &(parser->current_token)
+                                            );
         if(!elif_clause) return ERROR_MALLOC_FAILURE;
 
         StatusEnum st = analyzeCompoundList(parser, elif_clause);
         ERR_CHECK(st);
 
         if(!streq(parser->current_token.value, "then")) {
-            fprintf(stderr, "CyprSH: syntax error at line %d: expected 'then'\n", parser->lexer->line);
+            printError("analyzeElsePart", 
+                    "Syntax error at line %d: expected `then`",
+                    parser->lexer->line
+                );
             return ERROR_SYNTAX_ERROR;
         }
         advanceTokens(parser);
@@ -676,13 +785,19 @@ static StatusEnum analyzeElsePart(ParserPtr parser, ASTNodePtr if_clause) {
 
 static StatusEnum analyzeWhileClause(ParserPtr parser, ASTNodePtr pipeline) {
     // create while node
-    ASTNodePtr while_clause = createAndInsert(pipeline, NODE_WHILE_CLAUSE, NULL, NULL);
+    ASTNodePtr while_clause = createAndInsert(pipeline, 
+                                                NODE_WHILE_CLAUSE, 
+                                                &(parser->current_token)
+                                            );
     if(while_clause == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
 
     if(!streq(parser->current_token.value, "while")) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected 'while'\n", parser->lexer->line);
+        printError("analyzeWhileClause", 
+                    "Syntax error at line %d: expected `while`",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
     advanceTokens(parser);
@@ -699,7 +814,10 @@ static StatusEnum analyzeWhileClause(ParserPtr parser, ASTNodePtr pipeline) {
 static StatusEnum analyzeDoGroup(ParserPtr parser, ASTNodePtr parent) {
 
     if(!streq(parser->current_token.value, "do")) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected 'do'\n", parser->lexer->line);
+        printError("analyzeDoGroup", 
+                    "Syntax error at line %d: expected `do`",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
     advanceTokens(parser);
@@ -708,7 +826,10 @@ static StatusEnum analyzeDoGroup(ParserPtr parser, ASTNodePtr parent) {
     ERR_CHECK(st);
 
     if(!streq(parser->current_token.value, "done")) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected 'done'\n", parser->lexer->line);
+        printError("analyzeDoGroup", 
+                    "Syntax error at line %d: expected `done`",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
     advanceTokens(parser);
@@ -719,13 +840,16 @@ static StatusEnum analyzeDoGroup(ParserPtr parser, ASTNodePtr parent) {
 
 static StatusEnum analyzeUntilClause(ParserPtr parser, ASTNodePtr pipeline) {
     // create until node
-    ASTNodePtr until_clause = createAndInsert(pipeline, NODE_UNTIL_CLAUSE, NULL, NULL);
+    ASTNodePtr until_clause = createAndInsert(pipeline, NODE_UNTIL_CLAUSE, &parser->current_token);
     if(until_clause == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
 
     if(!streq(parser->current_token.value, "until")) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected 'until'\n", parser->lexer->line);
+        printError("analyzeUntilClause", 
+                    "Syntax error at line %d: expected `until`",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
     advanceTokens(parser);
@@ -741,24 +865,30 @@ static StatusEnum analyzeUntilClause(ParserPtr parser, ASTNodePtr pipeline) {
 
 static StatusEnum analyzeForClause(ParserPtr parser, ASTNodePtr pipeline) {
     // create for node
-    ASTNodePtr for_clause = createAndInsert(pipeline, NODE_FOR_CLAUSE, NULL, NULL);
+    ASTNodePtr for_clause = createAndInsert(pipeline, NODE_FOR_CLAUSE, &(parser->current_token));
     if(for_clause == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
 
     // for
     if(!streq(parser->current_token.value, "for")) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected 'for'\n", parser->lexer->line);
+        printError("analyzeForClause", 
+                    "Syntax error at line %d: expected `for`",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
     advanceTokens(parser);
 
     // name
     if(parser->current_token.type != TOKEN_WORD) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected word after 'for'\n", parser->lexer->line);
+        printError("analyzeForClause", 
+                    "Syntax error at line %d: expected another word after `for`",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
-    ASTNodePtr var = createAndInsert(for_clause, NODE_WORD, parser->current_token.value, parser->current_token.char_types);
+    ASTNodePtr var = createAndInsert(for_clause, NODE_WORD, &(parser->current_token));
     if(var == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -769,14 +899,17 @@ static StatusEnum analyzeForClause(ParserPtr parser, ASTNodePtr pipeline) {
             analyzeLineBreak(parser);
         }
         if(!streq(parser->current_token.value, "in")) {
-            fprintf(stderr, "CyprSH: syntax error at line %d: expected 'in' or newline after for variable\n", parser->lexer->line);
+            printError("analyzeForClause", 
+                    "Syntax error at line %d: expected 'in' or newline after for variable",
+                    parser->lexer->line
+                );
             return ERROR_SYNTAX_ERROR;
         }
         // consume 'in'
         advanceTokens(parser);
         // word list optional
         while(parser->current_token.type == TOKEN_WORD) {
-            ASTNodePtr word = createAndInsert(for_clause, NODE_WORD, parser->current_token.value, parser->current_token.char_types);
+            ASTNodePtr word = createAndInsert(for_clause, NODE_WORD, &(parser->current_token));
             if(!word) return ERROR_MALLOC_FAILURE;
             advanceTokens(parser);
         }
@@ -806,22 +939,28 @@ static StatusEnum analyzeForClause(ParserPtr parser, ASTNodePtr pipeline) {
 
 static StatusEnum analyzeCaseClause(ParserPtr parser, ASTNodePtr pipeline) {
     // create case node
-    ASTNodePtr case_clause = createAndInsert(pipeline, NODE_CASE_CLAUSE, NULL, NULL);
+    ASTNodePtr case_clause = createAndInsert(pipeline, NODE_CASE_CLAUSE, &(parser->current_token));
     if(case_clause == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
 
     if(!streq(parser->current_token.value, "case")) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected 'case'\n", parser->lexer->line);
+        printError("analyzeCaseClause", 
+                    "Syntax error at line %d: expected `case`",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
     advanceTokens(parser);
 
     if(parser->current_token.type != TOKEN_WORD) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected word after 'case'\n", parser->lexer->line);
+        printError("analyzeCaseClause", 
+                    "Syntax error at line %d: expected another word after `case`",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
-    ASTNodePtr word = createAndInsert(case_clause, NODE_WORD, parser->current_token.value, parser->current_token.char_types);
+    ASTNodePtr word = createAndInsert(case_clause, NODE_WORD, &(parser->current_token));
     if(word == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -829,7 +968,10 @@ static StatusEnum analyzeCaseClause(ParserPtr parser, ASTNodePtr pipeline) {
     analyzeLineBreak(parser);
 
     if(!streq(parser->current_token.value, "in")) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected 'in' after case word\n", parser->lexer->line);
+        printError("analyzeCaseClause", 
+                    "syntax error at line %d: expected `in` after `case word`",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
     advanceTokens(parser);
@@ -846,7 +988,10 @@ static StatusEnum analyzeCaseClause(ParserPtr parser, ASTNodePtr pipeline) {
 
     // expect 'esac'
     if(!streq(parser->current_token.value, "esac")) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected 'esac'\n", parser->lexer->line);
+        printError("analyzeCaseClause", 
+                    "Syntax error at line %d: expected `easc`",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
     advanceTokens(parser);
@@ -856,7 +1001,7 @@ static StatusEnum analyzeCaseClause(ParserPtr parser, ASTNodePtr pipeline) {
 
 
 static StatusEnum analyzeCaseItem(ParserPtr parser, ASTNodePtr case_clause) {
-    ASTNodePtr item = createAndInsert(case_clause, NODE_CASE_ITEM, NULL, NULL);
+    ASTNodePtr item = createAndInsert(case_clause, NODE_CASE_ITEM, &(parser->current_token));
     if(!item) return ERROR_MALLOC_FAILURE;
 
     // optional leading (
@@ -873,11 +1018,14 @@ static StatusEnum analyzeCaseItem(ParserPtr parser, ASTNodePtr case_clause) {
 
     // first pattern
     if(parser->current_token.type != TOKEN_WORD) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected pattern\n", parser->lexer->line);
+        printError("analyzeCaseItem", 
+                    "Syntax error at line %d: expected case item pattern",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
 
-    ASTNodePtr pattern = createAndInsert(item, NODE_WORD, parser->current_token.value, parser->current_token.char_types);
+    ASTNodePtr pattern = createAndInsert(item, NODE_WORD, &(parser->current_token));
     if(pattern == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -887,10 +1035,13 @@ static StatusEnum analyzeCaseItem(ParserPtr parser, ASTNodePtr case_clause) {
     while(parser->current_token.type == TOKEN_PIPE) {
         advanceTokens(parser);  // consume |
         if(parser->current_token.type != TOKEN_WORD) {
-            fprintf(stderr, "CyprSH: syntax error at line %d: expected pattern after '|'\n", parser->lexer->line);
+            printError("analyzeCaseItem", 
+                    "Syntax error at line %d: expected case item pattern after `|`",
+                    parser->lexer->line
+                );
             return ERROR_SYNTAX_ERROR;
         }
-        ASTNodePtr p = createAndInsert(item, NODE_WORD, parser->current_token.value, parser->current_token.char_types);
+        ASTNodePtr p = createAndInsert(item, NODE_WORD, &(parser->current_token));
         if(p == NULL) {
             return ERROR_MALLOC_FAILURE;
         }
@@ -899,7 +1050,10 @@ static StatusEnum analyzeCaseItem(ParserPtr parser, ASTNodePtr case_clause) {
 
     // expect )
     if(parser->current_token.type != TOKEN_RPAREN) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected ')'\n", parser->lexer->line);
+        printError("analyzeCaseItem", 
+                    "Syntax error at line %d: expected ')'",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
     advanceTokens(parser);
@@ -930,17 +1084,20 @@ static StatusEnum analyzeCaseItem(ParserPtr parser, ASTNodePtr case_clause) {
 
 static StatusEnum analyzeFunctionDef(ParserPtr parser, ASTNodePtr pipeline) {
     // create function node
-    ASTNodePtr function = createAndInsert(pipeline, NODE_FUNCTION_DEF, NULL, NULL);
+    ASTNodePtr function = createAndInsert(pipeline, NODE_FUNCTION_DEF, &(parser->current_token));
     if(function == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
 
     // name
     if(parser->current_token.type != TOKEN_WORD) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected function name\n", parser->lexer->line);
+        printError("analyzeFunctionDef", 
+                    "Syntax error at line %d: expected `function name`",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
-    ASTNodePtr name = createAndInsert(function, NODE_WORD, parser->current_token.value, parser->current_token.char_types);
+    ASTNodePtr name = createAndInsert(function, NODE_WORD, &(parser->current_token));
     if(name == NULL) {
         return ERROR_MALLOC_FAILURE;
     }
@@ -948,14 +1105,20 @@ static StatusEnum analyzeFunctionDef(ParserPtr parser, ASTNodePtr pipeline) {
 
     // expect LPAREN
     if(parser->current_token.type != TOKEN_LPAREN) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected '('\n", parser->lexer->line);
+        printError("analyzeFunctionDef", 
+                    "Syntax error at line %d: expected `(`",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
     advanceTokens(parser);
 
     // expect RPAREN
     if(parser->current_token.type != TOKEN_RPAREN) {
-        fprintf(stderr, "CyprSH: syntax error at line %d: expected ')'\n", parser->lexer->line);
+        printError("analyzeFunctionDef", 
+                    "Syntax error at line %d: expected `)`",
+                    parser->lexer->line
+                );
         return ERROR_SYNTAX_ERROR;
     }
     advanceTokens(parser);
@@ -991,14 +1154,17 @@ static StatusEnum analyzeCompoundCommand(ParserPtr parser, ASTNodePtr pipeline) 
     if(streq(parser->current_token.value, "case"))
         return analyzeCaseClause(parser, pipeline);
 
-    fprintf(stderr, "CyprSH: syntax error at line %d: expected compound command\n", parser->lexer->line);
+    printError("analyzeCompoundCommand", 
+                "Syntax error at line %d: expected compound command",
+                parser->lexer->line
+            );
     return ERROR_SYNTAX_ERROR;
 }
 
 
 StatusEnum parserCtor(ParserPtr parser, LexerPtr lexer) {
     if(lexer == NULL || parser == NULL) {
-        fprintf(stderr, "CyprSH: NULL pointer in initializing parser\n");
+        printError("parserCtor", "Passing NULL pointer");
         return ERROR_DEFAULT;
     }
 
@@ -1021,7 +1187,7 @@ void parserDtor(ParserPtr parser) {
 
 void parserReset(ParserPtr parser) {
     if(parser == NULL || parser->lexer == NULL) {
-        fprintf(stderr, "CyprSH: NULL pointer in reseting parser\n");
+        printError("parserReset", "Passing NULL pointer");
         return;
     }
 
@@ -1033,14 +1199,13 @@ void parserReset(ParserPtr parser) {
 
 StatusEnum analyze(ParserPtr parser, ASTNodePtr ast_root) {
     if(parser == NULL || parser->lexer == NULL || ast_root == NULL) {
-        fprintf(stderr, "CyprSH: NULL pointer in analyzing syntax\n");
+        printError("analyze", "Passing NULL pointer");
         return ERROR_SYNTAX_ERROR;
     }
 
     StatusEnum st = analyzeProgram(parser, ast_root);
     if(st != SUCCESS) {
         ASTFreeTree(ast_root);
-        fprintf(stderr, "CyprSH: syntax analysis failed with error code %d\n", st);
         return st;
     }
     return SUCCESS;
