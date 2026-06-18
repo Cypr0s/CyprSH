@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 
 typedef enum return_values {
     SUCCESS                     = EXIT_SUCCESS,  // 0
@@ -31,5 +32,7 @@ typedef enum return_values {
 } while(0)
 
 void printErrno(const char *path);
+
+void printError(const char* function_name, const char* format, ...);
 
 #endif // ERROR_H

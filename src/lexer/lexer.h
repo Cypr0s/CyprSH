@@ -8,9 +8,11 @@
 #include <string.h>
 #include <ctype.h>
 #include "data_structures/stack.h"
+#include "data_structures/char_buffer.h"
+#include "data_structures/int8_buffer.h"
 #include "utils/strings.h"
 
-#define MAX_TOKEN_LENGTH 1024
+#define LEXER_READ_ERR -2
 
 typedef enum {
     STATE_START, // starting state
@@ -72,6 +74,7 @@ typedef struct {
     TokenTypeEnum type;
     char* value;  // heap-allocated for WORD/IO_NUM; NULL for all others
     int8_t* char_types;
+    StatusEnum error_type;
 } Token, *TokenPtr;
 
 typedef struct {
@@ -79,9 +82,8 @@ typedef struct {
     Stack token_stack;       // stack for storing FSM states
     int32_t line;            // current line number 
     int32_t lookahead;       // one-char buffer (-1 = none)
-    char char_buffer[MAX_TOKEN_LENGTH];
-    int8_t type_buffer[MAX_TOKEN_LENGTH];
-    int16_t buffer_pos;
+    CharBuffer char_buff;
+    Int8Buffer int8_buff;
 } Lexer, *LexerPtr;
 
 StatusEnum lexerCtor(LexerPtr lex, FILE* input);
@@ -92,7 +94,7 @@ Token getToken(LexerPtr lex);
 
 void tokenFree(TokenPtr tok);
 
-void lexerReset(LexerPtr lex, FILE* input);
+StatusEnum lexerReset(LexerPtr lex, FILE* input);
 
 Token nullToken(void);
 

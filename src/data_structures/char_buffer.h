@@ -1,6 +1,7 @@
-#include "error.h"
+#ifndef CHAR_BUFFER_H
+#define CHAR_BUFFER_H
 
-#define DEFAULT_BUFFER_SIZE 16
+#include "data_structures/buffer.h"
 
 typedef struct {
     size_t size;
@@ -17,4 +18,6 @@ StatusEnum charBufferAppendChar(CharBufferPtr cb, char c);
 StatusEnum charBufferAppendCharPtr(CharBufferPtr cb, char* str, size_t str_size);
 
 char* charBufferTransfer(CharBufferPtr cb);
+
+#endif
 

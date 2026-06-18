@@ -4,38 +4,15 @@
 ASTNodePtr ASTNodeCtor(NodeTypeEnum type, char* value, int8_t* value_types) {
     ASTNodePtr node = (ASTNodePtr) malloc(sizeof(ASTNode));
     if(node == NULL) {
-        fprintf(stderr, "CyprSH: ASTNodeCtor: malloc failure\n");
+        printError("ASTNodeCtor", "Malloc failure");
         return NULL;
     }
-    // defaults
     node->type = type;
-    node->value = NULL;
-    node->value_types = NULL;
+    node->value = value;
+    node->value_types = value_types;
     node->children = NULL;
     node->num_children = 0;
     node->flags = 0;
-    // allocate, store value and value types
-    if(value != NULL) {
-        node->value = strdup(value);
-        if(node->value == NULL) {
-            free(node);
-            fprintf(stderr, "CyprSH: ASTNodeCtor: malloc failure\n");
-            return NULL;
-        }
-
-        size_t len = strlen(value);
-        if(value_types != NULL && len > 0) {
-            node->value_types = malloc(len);
-            if(node->value_types == NULL) {
-                free(node->value);
-                free(node);
-                fprintf(stderr, "CyprSH: ASTNodeCtor: malloc failure\n");
-                return NULL;
-            }
-            memcpy(node->value_types, value_types, len);
-        }
-    }
-
     return node;
 } // ASTNodeCtor
 
@@ -53,13 +30,13 @@ void ASTNodeDtor(ASTNodePtr node) {
 
 StatusEnum ASTaddChild(ASTNodePtr parent, ASTNodePtr child) {
     if(parent == NULL || child == NULL) {
-        fprintf(stderr, "CyprSH: adding NULL pointer child in syntax analysis\n");
+        printError("ASTaddChild", "Trying to insert `NULL` in AST");
         return ERROR_DEFAULT;
     }
 
     ASTNodePtr* new_children = realloc(parent->children, sizeof(ASTNodePtr) * (parent->num_children + 1));
     if(new_children == NULL) {
-        fprintf(stderr, "CyprSH: AST tree realloc failure\n");
+        printError("ASTaddChild", "Realloc failure");
         return ERROR_MALLOC_FAILURE;
     }
     parent->children = new_children;
