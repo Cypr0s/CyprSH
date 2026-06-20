@@ -1,4 +1,4 @@
-#include "executor/expansion.h"
+#include "executor/expander/expansion.h"
 
 // expander
 static StatusEnum expanderCtor(ExpanderPtr exp, ExecuteEnvironmentPtr env, const char* input, const int8_t* input_types);
@@ -8,6 +8,33 @@ static void expanderDtor(ExpanderPtr exp);
 static StatusEnum handleNormal(ExpanderPtr exp);
 static StatusEnum handleDollar(ExpanderPtr exp);
 static StatusEnum handleTilde(ExpanderPtr exp);
+
+
+static StatusEnum handleNormal(ExpanderPtr exp) {
+    char c = exp->input[exp->current_input_pos];
+    int8_t type = exp->input_types[exp->current_input_pos];
+
+    if(c == '$' && (type == QUOTE_UNQUOTED || type == QUOTE_DOUBLE_QUOTED)) {
+        StatusEnum st = stackPush(&(exp->state_stack), EXP_DOLLAR);
+        ERR_CHECK(st);
+        exp->current_input_pos++;
+        return SUCCESS;
+    }
+
+    if(c == '~' && exp->current_input_pos == 0 && type == QUOTE_UNQUOTED) {
+        StatusEnum st = stackPush(&(exp->state_stack), EXP_TILDE);
+        ERR_CHECK(st);
+        exp->current_input_pos++;
+        return SUCCESS;
+    }
+
+    StatusEnum st = charBufferAppendChar(&(exp->output), c);
+    ERR_CHECK(st);
+    exp->current_input_pos++;
+    return SUCCESS;
+}
+
+
 
 StatusEnum expandWord(ExecuteEnvironmentPtr env, const char* input, const int8_t* input_types, char** output) {
     Expander exp;

@@ -1,26 +1,34 @@
 #include "executor/execute.h"
 
+// utilities
 
-static const BuiltinEntry builtins[] = {
-    {"cd",     builtinCd},
+static const BuiltinEntry special_builtins[] = {
     {"exit",   builtinExit},
     {"export", builtinExport},
     {"unset",  builtinUnset},
+    {":",      builtinTrue},
+};
+
+static const BuiltinEntry regular_builtins[] = {
+    {"cd",     builtinCd},
     {"pwd",    builtinPwd},
     {"echo",   builtinEcho},
     {"true",   builtinTrue},
     {"false",  builtinFalse},
-    {":",      builtinTrue}, // works same as true
 };
 
+static BuiltIn findInBuiltinArray(const char* name, const BuiltinEntry* array, size_t count);
+static StatusEnum executeBuiltinCommand(BuiltIn fn, ASTNodePtr command_node, ASTNodePtr cmd_word, ExecuteEnvironmentPtr env);
+static StatusEnum executeExternalProgram(ASTNodePtr command_node, ASTNodePtr cmd_word, ExecuteEnvironmentPtr env);
 static StatusEnum handlePrefix(ASTNodePtr command_prefix, ExecuteEnvironmentPtr env);
 static StatusEnum handleSuffix(ASTNodePtr command_suffix, char** argv, int16_t* argc);
 static StatusEnum handleRedirect(ASTNodePtr redirect_node);
 static void getDefaultFD(RedirectTypeEnum type, int32_t* fd);
-static int8_t isBuiltin(const char* function_name);
 static char** buildEnvp(HashTablePtr env);
 static char* findPath(const char* cmd, const char* path_env);
-static BuiltIn findBuiltin(const char* function_name);
+static int8_t matchCaseItem(ASTNodePtr item_node, const char* match_value);
+
+// execution of nodes
 
 static StatusEnum executeProgramNode(ASTNodePtr program_node, ExecuteEnvironmentPtr env);
 static StatusEnum executeCompleteCommandNode(ASTNodePtr command_node, ExecuteEnvironmentPtr env);
@@ -28,27 +36,139 @@ static StatusEnum executeListNode(ASTNodePtr list_node, ExecuteEnvironmentPtr en
 static StatusEnum executeAndOrNode(ASTNodePtr and_or_node, ExecuteEnvironmentPtr env);
 static StatusEnum executePipelineNode(ASTNodePtr pipeline_node, ExecuteEnvironmentPtr env);
 static StatusEnum executeSimpleCommandNode(ASTNodePtr command_node, ExecuteEnvironmentPtr env);
+static StatusEnum executeBraceGroupNode(ASTNodePtr brace_group_node, ExecuteEnvironmentPtr env);
+static StatusEnum executeSubshellNode(ASTNodePtr subshell_node, ExecuteEnvironmentPtr env);
+static StatusEnum executeIfClauseNode(ASTNodePtr if_node, ExecuteEnvironmentPtr env);
+static StatusEnum executeElseClauseNode(ASTNodePtr else_node, ExecuteEnvironmentPtr env);
+static StatusEnum executeWhileClauseNode(ASTNodePtr while_node, ExecuteEnvironmentPtr env);
+static StatusEnum executeUntilClauseNode(ASTNodePtr until_node, ExecuteEnvironmentPtr env);
+static StatusEnum executeForClauseNode(ASTNodePtr for_node, ExecuteEnvironmentPtr env);
+static StatusEnum executeCaseClauseNode(ASTNodePtr case_node, ExecuteEnvironmentPtr env);
 
-
-static int8_t isBuiltin(const char* function_name) {
-    if(function_name == NULL) return 0;
-    
-    size_t count = sizeof(builtins) / sizeof(builtins[0]);
+static BuiltIn findInBuiltinArray(const char* name, const BuiltinEntry* array, size_t count) {
+    if(name == NULL) return NULL;
     for(size_t i = 0; i < count; i++) {
-        if(streq(function_name, builtins[i].name)) return 1;
+        if(streq(name, array[i].name)) {
+            return array[i].func;
+        }
     }
-    return 0;
+    return NULL;
 }
 
 
-static BuiltIn findBuiltin(const char* function_name) {
-    if(function_name == NULL) return NULL;
-    
-    size_t count = sizeof(builtins) / sizeof(builtins[0]);
-    for(size_t i = 0; i < count; i++) {
-        if(streq(function_name, builtins[i].name)) return builtins[i].func;
+static StatusEnum executeBuiltinCommand(BuiltIn fn, ASTNodePtr command_node, ASTNodePtr cmd_word, ExecuteEnvironmentPtr env) {
+    int32_t saved_stdin = dup(STDIN_FILENO);
+    int32_t saved_stdout = dup(STDOUT_FILENO);
+    int32_t saved_stderr = dup(STDERR_FILENO);
+
+    char* argv[MAX_ARGS + 1];
+    argv[0] = cmd_word->value;
+    int16_t argc = 1;
+
+    StatusEnum st = SUCCESS;
+    for(int16_t i = 0; i < command_node->num_children; i++) {
+        ASTNodePtr child = command_node->children[i];
+        if(child->type == NODE_CMD_PREFIX) {
+            st = handlePrefix(child, env);
+            if(st != SUCCESS) break;
+        } else if(child->type == NODE_CMD_SUFFIX) {
+            st = handleSuffix(child, argv, &argc);
+            if(st != SUCCESS) break;
+        }
     }
-    return NULL;
+    argv[argc] = NULL;
+
+    if(st == SUCCESS) {
+        fn(argc, argv, env);
+    }
+
+    dup2(saved_stdin, STDIN_FILENO);
+    dup2(saved_stdout, STDOUT_FILENO);
+    dup2(saved_stderr, STDERR_FILENO);
+    close(saved_stdin);
+    close(saved_stdout);
+    close(saved_stderr);
+
+    if(env->flags & EXEC_FLAG_CHILD_PROCESS) {
+        fflush(stdout);
+        exit(env->last_exec_status);
+    }
+
+    return SUCCESS;
+}
+
+
+static StatusEnum executeExternalProgram(ASTNodePtr command_node, ASTNodePtr cmd_word, ExecuteEnvironmentPtr env) {
+    pid_t pid = 0;
+    if(!(env->flags & EXEC_FLAG_CHILD_PROCESS)) {
+        pid = fork();
+        if(pid == -1) {
+            fprintf(stderr, "CyprSH: fork failed\n");
+            return ERROR_DEFAULT;
+        }
+    }
+
+    if(pid == 0) {
+        char* argv[MAX_ARGS + 1];
+        argv[0] = cmd_word->value;
+        int16_t argc = 1;
+        StatusEnum st;
+
+        for(int16_t i = 0; i < command_node->num_children; i++) {
+            if(command_node->children[i]->type == NODE_CMD_PREFIX) {
+                st = handlePrefix(command_node->children[i], env);
+                if(st != SUCCESS) {
+                    exit(st);
+                }
+            } else if(command_node->children[i]->type == NODE_CMD_WORD) {
+                continue;
+            } else if(command_node->children[i]->type == NODE_CMD_SUFFIX) {
+                st = handleSuffix(command_node->children[i], argv, &argc);
+                if(st != SUCCESS) {
+                    exit(st);
+                }
+            } else {
+                exit(ERROR_SYNTAX_ERROR);
+            }
+        }
+
+        argv[argc] = NULL;
+
+        char** envp = buildEnvp(env->env_table);
+        if(envp == NULL) {
+            fprintf(stderr, "CyprSH: failed to build environment\n");
+            exit(ERROR_DEFAULT);
+        }
+
+        char* env_path;
+        StatusEnum path_st = hashTableGetValue(env->env_table, "PATH", &env_path);
+        if(path_st != SUCCESS) {
+            exit(ERROR_DEFAULT);
+        }
+        char* exec_path = findPath(argv[0], env_path);
+        if(exec_path == NULL) {
+            fprintf(stderr, "CyprSH: %s: command not found\n", argv[0]);
+            exit(ERROR_COMMAND_NOT_FOUND);
+        }
+
+        execve(exec_path, argv, envp);
+        fprintf(stderr, "CyprSH: %s: cannot execute\n", argv[0]);
+        exit(ERROR_COMM_CANNOT_EXEC);
+    } else {
+        if(env->flags & EXEC_FLAG_BG) {
+            // TODO: handler for zombie cleanup, pid storing for $
+        } else {
+            int status;
+            waitpid(pid, &status, 0);
+            if(WIFEXITED(status)) {
+                env->last_exec_status = WEXITSTATUS(status);
+            } else if(WIFSIGNALED(status)) {
+                env->last_exec_status = 128 + WTERMSIG(status);
+            }
+        }
+    }
+
+    return SUCCESS;
 }
 
 
@@ -284,21 +404,19 @@ static char* findPath(const char* cmd, const char* path_env) {
 }
 
 
-StatusEnum executeNode(ASTNodePtr node, ExecuteEnvironmentPtr env) {
-    if(node == NULL) {
-        return SUCCESS;
+static int8_t matchCaseItem(ASTNodePtr item_node, const char* match_value) {
+    int16_t pattern_count = item_node->num_children;
+    if(pattern_count > 0 && item_node->children[pattern_count - 1]->type == NODE_LIST) {
+        pattern_count--;
     }
-    switch(node->type) {
-        case NODE_PROGRAM: return executeProgramNode(node, env);
-        case NODE_COMPLETE_COMMAND: return executeCompleteCommandNode(node, env);
-        case NODE_LIST: return executeListNode(node, env);
-        case NODE_AND_OR: return executeAndOrNode(node, env);
-        case NODE_PIPELINE: return executePipelineNode(node, env);
-        case NODE_SIMPLE_COMMAND: return executeSimpleCommandNode(node, env);
-        default:
-            return SUCCESS;
+
+    for(int16_t i = 0; i < pattern_count; i++) {
+        const char* pattern = item_node->children[i]->value;
+        if(fnmatch(pattern, match_value, 0) == 0) {
+            return 1;
+        }
     }
-    return SUCCESS;
+    return 0;
 }
 
 
@@ -465,7 +583,7 @@ static StatusEnum executeSimpleCommandNode(ASTNodePtr command_node, ExecuteEnvir
     if(command_node->num_children == 0) {
         return ERROR_SYNTAX_ERROR;
     }
-    StatusEnum st;
+
     ASTNodePtr cmd_word = NULL;
     for(int16_t i = 0; i < command_node->num_children; i++) {
         if(command_node->children[i]->type == NODE_CMD_WORD) {
@@ -475,133 +593,291 @@ static StatusEnum executeSimpleCommandNode(ASTNodePtr command_node, ExecuteEnvir
     }
 
     if(cmd_word == NULL) {
-        // assignments/redirections? only
         if(command_node->children[0]->type != NODE_CMD_PREFIX) {
             return ERROR_SYNTAX_ERROR;
         }
         return handlePrefix(command_node->children[0], env);
     }
 
-    // builtin, not pipelined
-    if(isBuiltin(cmd_word->value)) {
-        int32_t saved_stdin = dup(STDIN_FILENO);
-        int32_t saved_stdout = dup(STDOUT_FILENO);
-        int32_t saved_stderr = dup(STDERR_FILENO);
-
-        char* argv[MAX_ARGS + 1];
-        argv[0] = cmd_word->value;
-        int16_t argc = 1;
-
-        StatusEnum st = SUCCESS;
-        for(int16_t i = 0; i < command_node->num_children; i++) {
-            ASTNodePtr child = command_node->children[i];
-            if(child->type == NODE_CMD_PREFIX) {
-                st = handlePrefix(child, env);
-                if(st != SUCCESS) break;
-            } else if(child->type == NODE_CMD_SUFFIX) {
-                st = handleSuffix(child, argv, &argc);
-                if(st != SUCCESS) break;
-            }
-        }
-        argv[argc] = NULL;
-
-        if(st == SUCCESS) {
-            BuiltIn fn = findBuiltin(cmd_word->value);
-            fn(argc, argv, env);
-        }
-
-        // restore fds
-        dup2(saved_stdin, STDIN_FILENO);
-        dup2(saved_stdout, STDOUT_FILENO);
-        dup2(saved_stderr, STDERR_FILENO);
-        close(saved_stdin);
-        close(saved_stdout);
-        close(saved_stderr);
-
-        if(env->flags & EXEC_FLAG_CHILD_PROCESS) {
-            fflush(stdout);
-            exit(env->last_exec_status);
-        }
-
-        return SUCCESS;
+    // special builtins
+    BuiltIn fn = findInBuiltinArray(cmd_word->value, special_builtins,
+                                     sizeof(special_builtins) / sizeof(special_builtins[0])
+                                );
+    if(fn != NULL) {
+        return executeBuiltinCommand(fn, command_node, cmd_word, env);
     }
 
-    // pipelined or non builtin
-    pid_t pid = 0;
-    if(!(env->flags & EXEC_FLAG_CHILD_PROCESS)) {
-        pid = fork();
-        if(pid == -1) {
-            fprintf(stderr, "CyprSH: fork failed\n");
-            return ERROR_DEFAULT;
-        }
+    // defined function
+    ASTNodePtr func_body = functionListFind(&(env->function_list), cmd_word->value);
+    if(func_body != NULL) {
+        return executeNode(func_body, env);
     }
 
-    if(pid == 0) {
-        char* argv[MAX_ARGS + 1]; // maximum 64 arguments + binary name
-        argv[0] = cmd_word->value;
-        int16_t argc = 1;
-        // fill env, apply redirections, fill argv
-        for(int16_t i = 0; i < command_node->num_children; i++) {
-            if(command_node->children[i]->type == NODE_CMD_PREFIX) {
-                st = handlePrefix(command_node->children[i], env);
-                if(st != SUCCESS) {
-                    exit(st);
-                }
-            } else if(command_node->children[i]->type == NODE_CMD_WORD) {
-                continue;
-            } else if(command_node->children[i]->type == NODE_CMD_SUFFIX) {
-                st = handleSuffix(command_node->children[i], argv, &argc);
-                if(st != SUCCESS) {
-                    exit(st);
-                }
-            } else {
-                exit(ERROR_SYNTAX_ERROR);
-            }
-        }
-    
-        argv[argc] = NULL;
+    // regular builtin
+    fn = findInBuiltinArray(cmd_word->value, regular_builtins,
+                             sizeof(regular_builtins) / sizeof(regular_builtins[0])
+                        );
+    if(fn != NULL) {
+        return executeBuiltinCommand(fn, command_node, cmd_word, env);
+    }
 
-        // build env
-        char** envp = buildEnvp(env->env_table);
-        if(envp == NULL) {
-            fprintf(stderr, "CyprSH: failed to build environment\n");
-            exit(ERROR_DEFAULT);
-        }
+    // external
+    return executeExternalProgram(command_node, cmd_word, env);
+}
 
-        // get executable path
-        char* env_path;
-        st = hashTableGetValue(env->env_table, "PATH", &env_path);
+
+static StatusEnum executeBraceGroupNode(ASTNodePtr brace_group_node, ExecuteEnvironmentPtr env) {
+    if(brace_group_node->num_children == 0) {
+        return ERROR_SYNTAX_ERROR;
+    }
+    return executeNode(brace_group_node->children[0], env);
+}
+
+
+static StatusEnum executeSubshellNode(ASTNodePtr subshell_node, ExecuteEnvironmentPtr env) {
+    if(subshell_node->num_children == 0) {
+        return ERROR_SYNTAX_ERROR;
+    }
+
+    pid_t p = fork();
+    if(p == -1) {
+        return ERROR_DEFAULT;
+    }
+
+    if(p == 0) {
+        StatusEnum st = executeNode(subshell_node->children[0], env);
         if(st != SUCCESS) {
-            exit(ERROR_DEFAULT);
+            exit(st);
         }
-        char* exec_path = findPath(argv[0], env_path);
-        if(exec_path == NULL) {
-            fprintf(stderr, "CyprSH: %s: command not found\n", argv[0]);
-            exit(ERROR_COMMAND_NOT_FOUND);
-        }
-
-        execve(exec_path, argv, envp);
-        fprintf(stderr, "CyprSH: %s: cannot execute\n", argv[0]);
-        exit(ERROR_COMM_CANNOT_EXEC);
-    } else {
-        if(env->flags & EXEC_FLAG_BG) {
-            // TODO: handler for zombie cleanup, pid storing for $
-        } else {
-            int status;
-            waitpid(pid, &status, 0);
-            if(WIFEXITED(status)) {
-                env->last_exec_status = WEXITSTATUS(status);
-            } else if(WIFSIGNALED(status)) {
-                env->last_exec_status = 128 + WTERMSIG(status);
-            }
-        }
+        exit(env->last_exec_status);
     }
-    
+    int32_t status; 
+    waitpid(p, &status, 0);
+    env->last_exec_status = WIFEXITED(status) ? WEXITSTATUS(status) : 1;
     return SUCCESS;
 }
+
+
+static StatusEnum executeIfClauseNode(ASTNodePtr if_node, ExecuteEnvironmentPtr env) {
+    if(if_node->num_children < 2 || if_node->num_children > 3) {
+        return ERROR_SYNTAX_ERROR;
+    }
+
+    StatusEnum st = executeNode(if_node->children[0], env);
+    ERR_CHECK(st);
+
+    if(env->last_exec_status == 0) {
+        return executeNode(if_node->children[1], env);
+    }
+    // non zero 
+    if(if_node->num_children == 3) {
+        return executeNode(if_node->children[2], env);
+    }
+    return SUCCESS;
+}
+
+
+static StatusEnum executeElseClauseNode(ASTNodePtr else_node, ExecuteEnvironmentPtr env) {
+    if(else_node->num_children == 0) {
+        return ERROR_SYNTAX_ERROR;
+    }
+    return executeNode(else_node->children[0], env);
+}
+
+
+static StatusEnum executeWhileClauseNode(ASTNodePtr while_node, ExecuteEnvironmentPtr env) {
+    if(while_node->num_children != 2) {
+        return ERROR_SYNTAX_ERROR;
+    }
+
+    StatusEnum st;
+    int8_t executed_body = 0;
+
+    while(1) {
+        st = executeNode(while_node->children[0], env);
+        ERR_CHECK(st);
+
+        if(env->last_exec_status != 0) {
+            break;
+        }
+
+        executed_body = 1;
+        st = executeNode(while_node->children[1], env);
+        ERR_CHECK(st);
+
+        if(env->flags & EXEC_FLAG_EXIT) {
+            break;
+        }
+    }
+
+    if(!executed_body) {
+        env->last_exec_status = 0;
+    }
+
+    return SUCCESS;
+}
+
+
+static StatusEnum executeUntilClauseNode(ASTNodePtr until_node, ExecuteEnvironmentPtr env) {
+    if(until_node->num_children != 2) {
+        return ERROR_SYNTAX_ERROR;
+    }
+
+    StatusEnum st;
+    int8_t executed_body = 0;
+
+    while(1) {
+        st = executeNode(until_node->children[0], env);
+        ERR_CHECK(st);
+
+        if(env->last_exec_status == 0) {
+            break;
+        }
+
+        executed_body = 1;
+        st = executeNode(until_node->children[1], env);
+        ERR_CHECK(st);
+
+        if(env->flags & EXEC_FLAG_EXIT) {
+            break;
+        }
+    }
+
+    if(executed_body == 0) {
+        env->last_exec_status = 0;
+    }
+
+    return SUCCESS;
+}
+
+
+static StatusEnum executeForClauseNode(ASTNodePtr for_node, ExecuteEnvironmentPtr env) {
+    if(for_node->num_children < 2) {
+        return ERROR_SYNTAX_ERROR;
+    }
+
+    char* var_name = for_node->children[0]->value;
+    int16_t word_count = for_node->num_children - 2; // - `var` [0] and `body` [num_children - 1]
+
+    StatusEnum st;
+    int8_t executed_body = 0;
+
+    for(int16_t i = 1; i <= word_count; i++) {
+        char* word_value = for_node->children[i]->value;
+
+        st = hashTableInsert(env->env_table, var_name, word_value);
+        ERR_CHECK(st);
+
+        executed_body = 1;
+        st = executeNode(for_node->children[for_node->num_children - 1], env);
+        ERR_CHECK(st);
+
+        if(env->flags & EXEC_FLAG_EXIT) {
+            break;
+        }
+    }
+
+    if(executed_body == 0) {
+        env->last_exec_status = 0;
+    }
+
+    return SUCCESS;
+}
+
+
+static StatusEnum executeCaseClauseNode(ASTNodePtr case_node, ExecuteEnvironmentPtr env) {
+    if(case_node->num_children < 1) {
+        return ERROR_SYNTAX_ERROR;
+    }
+
+    const char* match_value = case_node->children[0]->value;
+
+    StatusEnum st;
+    int8_t executed_any = 0;
+    int8_t fall_through = 0;
+
+    for(int16_t i = 1; i < case_node->num_children; i++) {
+        ASTNodePtr item = case_node->children[i];
+        if(item->num_children == 0) {
+            return ERROR_SYNTAX_ERROR;
+        } 
+
+        if(fall_through == 0 && matchCaseItem(item, match_value) == 0) {
+            continue;
+        }
+
+        executed_any = 1;
+
+        ASTNodePtr body = item->children[item->num_children - 1];
+        if(body->type == NODE_LIST) {
+            st = executeNode(body, env);
+            ERR_CHECK(st);
+        }
+
+        if(item->flags & FLAG_SEMI_AND) { // ;& -> fall through
+            fall_through = 1;
+            continue;
+        }
+
+        break;  // ;; -> end
+    }
+
+    if(executed_any == 0) {
+        env->last_exec_status = 0;
+    }
+
+    return SUCCESS;
+}
+
+
+static StatusEnum executeFunctionDefinition(ASTNodePtr function_node, ExecuteEnvironmentPtr env) {
+    if(function_node->num_children < 2) {
+        return ERROR_SYNTAX_ERROR;
+    }
+
+    char* name = function_node->children[0]->value;
+    ASTNodePtr body = function_node->children[1];
+
+    return functionListInsert(&(env->function_list), name, body);
+}
+
+
 
 void executorCtor(ExecuteEnvironmentPtr env, HashTablePtr p_env) {
    env->env_table = p_env;
    env->last_exec_status = 0;
    env->flags = EXEC_FLAG_NONE;
+   functionListCtor(&(env->function_list));
+}
+
+
+void executorDtor(ExecuteEnvironmentPtr env) {
+    functionListDtor(&(env->function_list));
+}
+
+
+StatusEnum executeNode(ASTNodePtr node, ExecuteEnvironmentPtr env) {
+    if(node == NULL) {
+        return SUCCESS;
+    }
+    switch(node->type) {
+        case NODE_PROGRAM: return executeProgramNode(node, env);
+        case NODE_COMPLETE_COMMAND: return executeCompleteCommandNode(node, env);
+        case NODE_LIST: return executeListNode(node, env);
+        case NODE_AND_OR: return executeAndOrNode(node, env);
+        case NODE_PIPELINE: return executePipelineNode(node, env);
+        case NODE_SIMPLE_COMMAND: return executeSimpleCommandNode(node, env);
+        case NODE_BRACE_GROUP: return executeBraceGroupNode(node, env);
+        case NODE_SUBSHELL: return executeSubshellNode(node, env);
+        case NODE_IF_CLAUSE: return executeIfClauseNode(node, env);
+        case NODE_ELSE_CLAUSE: return executeElseClauseNode(node, env);
+        case NODE_WHILE_CLAUSE: return executeWhileClauseNode(node, env);
+        case NODE_UNTIL_CLAUSE: return executeUntilClauseNode(node, env);
+        case NODE_FOR_CLAUSE: return executeForClauseNode(node, env);
+        case NODE_CASE_CLAUSE: return executeCaseClauseNode(node, env);
+        case NODE_FUNCTION_DEF: return executeFunctionDefinition(node, env);
+        default:
+            return SUCCESS;
+    }
+    return SUCCESS;
 }

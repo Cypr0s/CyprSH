@@ -1,7 +1,6 @@
 #include "shell.h"
 
 
-
 int32_t main(int32_t argc, char **argv) {
     extern char **environ;
 
@@ -34,10 +33,8 @@ int32_t main(int32_t argc, char **argv) {
         fclose(input);
 
     } else if(isatty(STDIN_FILENO)) {
-        // interactive mode
         st = runInteractive(&env_table);
     } else {
-        // pipe/stdin mode: echo "ls" | ./cyprsh
         st = runScript(stdin, &env_table);
     }
 
