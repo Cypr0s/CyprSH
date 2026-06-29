@@ -1,3 +1,13 @@
+/**
+ * @file        execute_types.h
+ * @author      Kristian Luptak <kristian.luptak@outlook.com>
+ * @version     1.0.1
+ * @date        2026-06-29
+ * @copyright   Copyright (c) 2026
+ * 
+ * @brief   Execution environment types and structures
+ */
+
 #ifndef EXECUTE_TYPES_H
 #define EXECUTE_TYPES_H
 

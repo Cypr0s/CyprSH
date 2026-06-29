@@ -1,6 +1,20 @@
+/**
+ * @file        char_buffer.c
+ * @author      Kristian Luptak <kristian.luptak@outlook.com>
+ * @version     1.0.1
+ * @date        2026-06-29
+ * @copyright   Copyright (c) 2026
+ * 
+ * @brief   Character buffer implementation
+ */
+
 #include "data_structures/char_buffer.h"
 
-
+/** @brief Initialize character buffer
+ *  @param cb Buffer to initialize
+ *  @param capacity Initial capacity (0 uses default)
+ *  @return Status code
+ */
 StatusEnum charBufferCtor(CharBufferPtr cb, size_t capacity) {
     if(cb == NULL) {
         printError("charBufferCtor", "Passing NULL pointer");
@@ -18,7 +32,9 @@ StatusEnum charBufferCtor(CharBufferPtr cb, size_t capacity) {
     return SUCCESS;
 }
 
-
+/** @brief Destroy character buffer
+ *  @param cb Buffer to destroy
+ */
 void charBufferDtor(CharBufferPtr cb) {
     if(cb == NULL) {
         return;
@@ -30,7 +46,11 @@ void charBufferDtor(CharBufferPtr cb) {
     cb->capacity = 0;
 }
 
-
+/** @brief Append single character to buffer
+ *  @param cb Target buffer
+ *  @param c Character to append
+ *  @return Status code
+ */
 StatusEnum charBufferAppendChar(CharBufferPtr cb, char c) {
     if(cb == NULL) {
         printError("charBufferAppend", "Passing NULL pointer");
@@ -40,7 +60,12 @@ StatusEnum charBufferAppendChar(CharBufferPtr cb, char c) {
     return charBufferAppendCharPtr(cb, &c, 1);
 }
 
-
+/** @brief Append character string to buffer
+ *  @param cb Target buffer
+ *  @param str String data to append
+ *  @param str_size Number of characters to append
+ *  @return Status code
+ */
 StatusEnum charBufferAppendCharPtr(CharBufferPtr cb, char* str, size_t str_size) {
     if(cb == NULL || str == NULL) {
         printError("charBufferAppend", "Passing NULL pointer");
@@ -66,7 +91,10 @@ StatusEnum charBufferAppendCharPtr(CharBufferPtr cb, char* str, size_t str_size)
     return SUCCESS;
 }
 
-
+/** @brief Transfer buffer ownership and reset
+ *  @param cb Buffer to transfer
+ *  @return Pointer to buffer data (caller must free)
+ */
 char* charBufferTransfer(CharBufferPtr cb) {
     if(cb == NULL) {
         printError("charBufferTransfer", "Passing NULL pointer");

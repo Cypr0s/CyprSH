@@ -1,3 +1,13 @@
+/**
+ * @file        lexer.c
+ * @author      Kristian Luptak <kristian.luptak@outlook.com>
+ * @version     1.0.1
+ * @date        2026-06-29
+ * @copyright   Copyright (c) 2026
+ * 
+ * @brief   Lexical analyzer implementation
+ */
+
 #include "lexer/lexer.h"
 
 // utils

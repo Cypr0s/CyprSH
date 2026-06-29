@@ -1,5 +1,21 @@
+/**
+ * @file        export.c
+ * @author      Kristian Luptak <kristian.luptak@outlook.com>
+ * @version     1.0.1
+ * @date        2026-06-29
+ * @copyright   Copyright (c) 2026
+ * 
+ * @brief   Export builtin special implementation
+ */
+
 #include "builtins/export.h"
 
+/** @brief Export/list environment variables
+ *  @param argc Argument count
+ *  @param argv Argument values (key=value pairs)
+ *  @param env Execute environment
+ *  @return Status code
+ */
 StatusEnum builtinExport(int16_t argc, char** argv, ExecuteEnvironmentPtr env) {
     // no args list all env vars
     if(argc < 2) {

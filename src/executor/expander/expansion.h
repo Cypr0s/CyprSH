@@ -1,3 +1,13 @@
+/**
+ * @file        expansion.h
+ * @author      Kristian Luptak <kristian.luptak@outlook.com>
+ * @version     1.0.1
+ * @date        2026-06-29
+ * @copyright   Copyright (c) 2026
+ * 
+ * @brief   Parameter and variable expansion
+ */
+
 #include "error.h"
 #include "execute_types.h"
 #include "data_structures/stack.h"
@@ -30,4 +40,11 @@ typedef struct {
     CharBuffer name;
 } Expander, *ExpanderPtr;
 
+/** @brief Expand word with parameter substitution
+ *  @param env Execution environment
+ *  @param input Input word string
+ *  @param input_types Array of character type flags
+ *  @param output Output pointer for expanded string
+ *  @return Status code
+ */
 StatusEnum expandWord(ExecuteEnvironmentPtr env, const char* input, const int8_t* input_types, char** output);

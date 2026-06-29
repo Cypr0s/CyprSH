@@ -1,5 +1,20 @@
+/**
+ * @file        strings.c
+ * @author      Kristian Luptak <kristian.luptak@outlook.com>
+ * @version     1.0.1
+ * @date        2026-06-29
+ * @copyright   Copyright (c) 2026
+ * 
+ * @brief   String utility functions implementation
+ */
+
 #include "utils/strings.h"
 
+/** @brief Compare two strings for equality
+ *  @param str1 First string
+ *  @param str2 Second string
+ *  @return 1 if equal, 0 otherwise
+ */
 uint8_t streq(const char* str1, const char* str2) {
     if(str1 == NULL || str2 == NULL) return 0U;
     while(*str1 && *str2) {
@@ -11,7 +26,10 @@ uint8_t streq(const char* str1, const char* str2) {
     return (*str1 == *str2) ? 1U : 0U;
 }
 
-
+/** @brief Duplicate string
+ *  @param src Source string to duplicate
+ *  @return Pointer to new string (caller must free) or NULL
+ */
 char* strdup(const char* src) {
     size_t len = strlen(src);
     char* copy = (char*) malloc(len + 1);
@@ -22,7 +40,12 @@ char* strdup(const char* src) {
     return copy;
 }
 
-
+/** @brief Split assignment string into key and value
+ *  @param str Assignment string (key=value format)
+ *  @param key Output pointer for key string
+ *  @param value Output pointer for value string
+ *  @return Status code
+ */
 StatusEnum splitAssignment(const char* str, char** key, char** value) {
     if(str == NULL || key == NULL || value == NULL) {
         return ERROR_DEFAULT;

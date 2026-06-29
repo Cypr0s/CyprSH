@@ -1,3 +1,13 @@
+/**
+ * @file        ast.h
+ * @author      Kristian Luptak <kristian.luptak@outlook.com>
+ * @version     1.0.1
+ * @date        2026-06-29
+ * @copyright   Copyright (c) 2026
+ * 
+ * @brief   Abstract Syntax Tree node definitions and operations
+ */
+
 #ifndef AST_H
 #define AST_H
 
@@ -67,13 +77,29 @@ typedef struct ASTNode {
     int16_t num_children;
 } ASTNode, *ASTNodePtr, **ASTNodePtrPtr;
 
-
+/** @brief Create new AST node
+ *  @param type Node type enum
+ *  @param value Node value string
+ *  @param value_types Array of character type flags
+ *  @return Pointer to new AST node or NULL on failure
+ */
 ASTNodePtr ASTNodeCtor(NodeTypeEnum type, char* value, int8_t* value_types);
 
+/** @brief Destroy single AST node
+ *  @param node Node to destroy
+ */
 void ASTNodeDtor(ASTNodePtr node);
 
+/** @brief Add child node to parent
+ *  @param parent Parent node
+ *  @param child Child node to add
+ *  @return Status code
+ */
 StatusEnum ASTaddChild(ASTNodePtr parent, ASTNodePtr child);
 
+/** @brief Recursively free AST tree
+ *  @param node Root node to free
+ */
 void ASTFreeTree(ASTNodePtr node);
 
 #endif // AST_H

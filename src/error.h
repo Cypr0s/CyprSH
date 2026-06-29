@@ -1,3 +1,13 @@
+/**
+ * @file        error.h
+ * @author      Kristian Luptak <kristian.luptak@outlook.com>
+ * @version     1.0.1
+ * @date        2026-06-29
+ * @copyright   Copyright (c) 2026
+ * 
+ * @brief   Error handling and status codes
+ */
+
 #ifndef ERROR_H
 #define ERROR_H
 
@@ -32,8 +42,15 @@ typedef enum return_values {
     } \
 } while(0)
 
+/** @brief Prints system error for a given path
+ *  @param path Path string for error message
+ */
 void printErrno(const char *path);
 
+/** @brief Prints formatted error message
+ *  @param function_name Name of function where error occurred
+ *  @param format Format string with variadic arguments
+ */
 void printError(const char* function_name, const char* format, ...);
 
 #endif // ERROR_H

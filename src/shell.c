@@ -1,6 +1,20 @@
+/**
+ * @file        shell.c
+ * @author      Kristian Luptak <kristian.luptak@outlook.com>
+ * @version     1.0.1
+ * @date        2026-06-29
+ * @copyright   Copyright (c) 2026
+ * 
+ * @brief   Shell execution modes: interactive, script, and string
+ */
+
 #include "shell.h"
 
-
+/** @brief Main entry point for shell
+ *  @param argc Argument count
+ *  @param argv Command line arguments
+ *  @return Exit status code
+ */
 int32_t main(int32_t argc, char **argv) {
     extern char **environ;
 

@@ -1,5 +1,21 @@
+/**
+ * @file        file.c
+ * @author      Kristian Luptak <kristian.luptak@outlook.com>
+ * @version     1.0.1
+ * @date        2026-06-29
+ * @copyright   Copyright (c) 2026
+ * 
+ * @brief   File operations implementation
+ */
+
 #include "utils/file.h"
 
+/** @brief Open file with given flags
+ *  @param path File path
+ *  @param flag Open flags (O_RDONLY, etc.)
+ *  @param file_descriptor Output file descriptor
+ *  @return Status code
+ */
 StatusEnum openFile(const char* path, uint32_t flag, int32_t* file_descriptor) {
     *file_descriptor = open(path, flag, 0644);
     if(*file_descriptor != -1) {
@@ -15,7 +31,10 @@ StatusEnum openFile(const char* path, uint32_t flag, int32_t* file_descriptor) {
     return ERROR_DEFAULT;
 }
 
-
+/** @brief Create new file (ignored if exists)
+ *  @param name_path File path to create
+ *  @return Status code
+ */
 StatusEnum createFile(const char* path) {
     int32_t file_descriptor = open(path, O_CREAT | O_EXCL, 0644);
     if(file_descriptor >= 0) {

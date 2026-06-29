@@ -1,6 +1,19 @@
+/**
+ * @file        stack.c
+ * @author      Kristian Luptak <kristian.luptak@outlook.com>
+ * @version     1.0.1
+ * @date        2026-06-29
+ * @copyright   Copyright (c) 2026
+ * 
+ * @brief   Stack implementation
+ */
+
 #include "data_structures/stack.h"
 
-
+/** @brief Initialize stack to empty state
+ *  @param stack Stack to initialize
+ *  @return Status code
+ */
 StatusEnum stackCtor(StackPtr stack) {
     if (stack == NULL) {
         printError("stackInit", "Passing NULL pointer");
@@ -10,7 +23,11 @@ StatusEnum stackCtor(StackPtr stack) {
     return SUCCESS;
 }
 
-
+/** @brief Push value onto stack
+ *  @param stack Target stack
+ *  @param value Value to push
+ *  @return Status code
+ */
 StatusEnum stackPush(StackPtr stack, int8_t value) {
     if (stack == NULL) {
         printError("stackPush", "Passing NULL pointer");
@@ -25,7 +42,10 @@ StatusEnum stackPush(StackPtr stack, int8_t value) {
     return SUCCESS;
 }
 
-
+/** @brief Pop value from stack
+ *  @param stack Target stack
+ *  @return Status code
+ */
 StatusEnum stackPop(StackPtr stack) {
     if (stack == NULL) {
         printError("stackPop", "Passing NULL pointer");
@@ -39,7 +59,11 @@ StatusEnum stackPop(StackPtr stack) {
     return SUCCESS;
 }
 
-
+/** @brief Get top value without removing
+ *  @param stack Source stack
+ *  @param out Output pointer for top value
+ *  @return Status code
+ */
 StatusEnum stackTop(StackPtr stack, int8_t* out) {
     if (stack == NULL || out == NULL) {
         printError("stackTop", "Passing NULL pointer");
@@ -53,7 +77,10 @@ StatusEnum stackTop(StackPtr stack, int8_t* out) {
     return SUCCESS;
 }
 
-
+/** @brief Check if stack is empty
+ *  @param stack Stack to check
+ *  @return 1 if empty, 0 if not, -1 on error
+ */
 int8_t stackIsEmpty(StackPtr stack) {
     if(stack == NULL) {
         printError("stackIsEmpty", "Passing NULL pointer");

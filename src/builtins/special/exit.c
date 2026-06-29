@@ -1,6 +1,21 @@
+/**
+ * @file        exit.c
+ * @author      Kristian Luptak <kristian.luptak@outlook.com>
+ * @version     1.0.1
+ * @date        2026-06-29
+ * @copyright   Copyright (c) 2026
+ * 
+ * @brief   Exit builtin special implementation
+ */
+
 #include "builtins/exit.h"
 
-
+/** @brief Exit shell with optional exit code
+ *  @param argc Argument count
+ *  @param argv Argument values (argv[1] is exit code)
+ *  @param env Execute environment
+ *  @return Status code
+ */
 StatusEnum builtinExit(int16_t argc, char** argv, ExecuteEnvironmentPtr env) {
     if(argc > 2) {
         printError("exit", "too many arguments");

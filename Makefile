@@ -46,3 +46,7 @@ fclean: clean
 
 # rebuild
 rebuild: fclean all
+
+# docs
+docs: 
+	doxygen Doxyfile
