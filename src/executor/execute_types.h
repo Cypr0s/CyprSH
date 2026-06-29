@@ -29,6 +29,10 @@ typedef struct {
     FunctionList function_list;
     int8_t flags;
     uint8_t last_exec_status;
+    pid_t shell_pid;
+    pid_t last_bg_pid;
+    char** arguments;
+    int16_t arguments_count;
 } ExecuteEnvironment, *ExecuteEnvironmentPtr;
 
 typedef StatusEnum (*BuiltIn) (int16_t argc, char** argv, ExecuteEnvironmentPtr env);

@@ -1,5 +1,11 @@
 /**
+ * @file        htab.c
+ * @author      Kristian Luptak <kristian.luptak@outlook.com>
+ * @version     1.0.1
+ * @date        2026-06-29
+ * @copyright   Copyright (c) 2026
  * 
+ * @brief   
  */
 
 #include "data_structures/htab.h"
@@ -426,7 +432,7 @@ StatusEnum hashTableGetValue(HashTablePtr table, char* key, char** value) {
     
     HashTableItemPtr item = &(table->data[index]);
     if(item->state == ITEM_STATE_EMPTY || item->state == ITEM_STATE_DELETED) {
-        return ERROR_DEFAULT;
+        return ERROR_HTAB_ITEM;
     }
     // returning the value
     *value = item->value;

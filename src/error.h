@@ -21,6 +21,7 @@ typedef enum return_values {
     ERROR_SYNTAX_ERROR          = 10,
     ERROR_FILE_NOT_READABLE     = 11,
     ERROR_FILE_NOT_FOUND        = 12,
+    ERROR_HTAB_ITEM             = 13,
     ERROR_COMM_CANNOT_EXEC      = 126,
     ERROR_COMMAND_NOT_FOUND     = 127,
 } StatusEnum;
