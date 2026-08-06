@@ -11,13 +11,13 @@
 #ifndef SHELL_H
 #define SHELL_H
 
-#include "utils/file.h"
-#include "utils/env.h"
+#include "utilities/file.h"
+#include "utilities/env.h"
 #include <readline/readline.h>
 #include <readline/history.h>
-#include "parser/syntax.h"
-#include "lexer/lexer.h"
-#include "executor/execute.h"
+#include "syntax-analysis/syntax-parser.h"
+#include "lexical-analysis/tokenize.h"
+#include "execution/execute.h"
 
 #define HISTORY_FILE_NAME "CyprSH_history"
 

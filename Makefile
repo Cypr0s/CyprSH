@@ -8,7 +8,7 @@ SRC    := $(shell find src -name '*.c')
 OBJ     = $(SRC:.c=.o)
 TARGET  = cyprsh
 
-.PHONY: all debug release run valgrind clean fclean rebuild
+.PHONY: all debug release run valgrind clean fclean rebuild docs
 
 # default build
 all: $(TARGET)
