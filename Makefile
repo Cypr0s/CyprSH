@@ -7,6 +7,7 @@ LDFLAGS = -lreadline
 SRC    := $(shell find src -name '*.c')
 OBJ     = $(SRC:.c=.o)
 TARGET  = cyprsh
+ZIP_NAME = CyprSH-source.zip
 
 .PHONY: all debug release run valgrind clean fclean rebuild docs
 
@@ -50,3 +51,7 @@ rebuild: fclean all
 # docs
 docs: 
 	doxygen Doxyfile
+
+
+zip:
+	zip -r $(ZIP_NAME) src Makefile Doxyfile

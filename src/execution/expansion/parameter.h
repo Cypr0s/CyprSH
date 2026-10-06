@@ -25,6 +25,7 @@ typedef enum {
 typedef struct {
     ParameterOperationEnum op;
     size_t word_start;
+    size_t word_end;
     size_t parameter_start;
     size_t parameter_end;
     uint8_t has_colon;

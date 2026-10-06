@@ -10,13 +10,10 @@
 
 #include "execution/expansion/expansion.h"
 
-// expander
-static StatusEnum expanderCtor(ExpanderPtr exp, ExecuteEnvironmentPtr env, const char* input, const int8_t* input_types);
-static void expanderDtor(ExpanderPtr exp);
 
 // finite states handling
 static StatusEnum expandNormal(ExpanderPtr exp);
-static StatusEnum handleDollar(ExpanderPtr exp);
+static StatusEnum expandDollar(ExpanderPtr exp);
 
 
 static StatusEnum expandNormal(ExpanderPtr exp) {
@@ -41,7 +38,7 @@ static StatusEnum expandNormal(ExpanderPtr exp) {
 }
 
 
-static StatusEnum handleDollar(ExpanderPtr exp) {
+static StatusEnum expandDollar(ExpanderPtr exp) {
     if(exp->current_input_pos >= exp->input_length) {
         StatusEnum st = charBufferAppendChar(&(exp->output), '$');
         ERR_CHECK(st);
@@ -180,18 +177,6 @@ static StatusEnum handleDollar(ExpanderPtr exp) {
     return stackPop(&(exp->state_stack));
 }
 
-static StatusEnum handleArithmetic(ExpanderPtr exp) {
-    (void)exp;
-    // TODO: arithmetic expansion $((expr)) not implemented yet
-    return ERROR_DEFAULT;
-}
-
-static StatusEnum handleCommandSub(ExpanderPtr exp) {
-    (void)exp;
-    // TODO: command substitution $(cmd) not implemented yet
-    return ERROR_DEFAULT;
-}
-
 
 StatusEnum expandWord(ExecuteEnvironmentPtr env, const char* input, const int8_t* input_types, char** output) {
     Expander exp;
@@ -211,22 +196,22 @@ StatusEnum expandWord(ExecuteEnvironmentPtr env, const char* input, const int8_t
 
         switch(state) {
             case EXP_NORMAL:
-                st = handleNormal(&exp);
+                st = expandNormal(&exp);
                 break;
             case EXP_DOLLAR:
-                st = handleDollar(&exp);
+                st = expandDollar(&exp);
                 break;
             case EXP_TILDE:
-                st = handleTilde(&exp);
+                st = expandTilde(&exp);
                 break;
             case EXP_ARITHMETIC:
-                st = handleArithmetic(&exp);
+                st = expandArithmetic(&exp);
                 break;
             case EXP_COMMAND_SUB:
-                st = handleCommandSub(&exp);
+                st = expandCommandSub(&exp);
                 break;
             case EXP_BRACE:
-                st = handleBrace(&exp);
+                st = expandParameter(&exp);
                 break;
             default:
                 st = ERROR_DEFAULT;
