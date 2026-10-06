@@ -35,12 +35,18 @@ make debug # debug build with sanitizers
 
 ```
 
-## Usage
+**## Usage**
+
 ```sh
 
-./cyprsh # interactive mode
+./cyprsh-linux-x86_64 # interactive mode
+
+./cyprsh-linux-x86_64 -c 'echo "Hello world"' # command mode
+
+./cyprsh-linux-x86_64 script.sh # script mode
 
 ```
+
 
 ## Examples
 
