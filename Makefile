@@ -2,11 +2,9 @@ CC = gcc
 CFLAGS = -Wall -Wextra -Isrc
 LDFLAGS = -lreadline
 
-
-
 SRC    := $(shell find src -name '*.c')
 OBJ     = $(SRC:.c=.o)
-TARGET  = cyprsh
+TARGET  = cyprsh-linux-x86_64
 ZIP_NAME = CyprSH-source.zip
 
 .PHONY: all debug release run valgrind clean fclean rebuild docs

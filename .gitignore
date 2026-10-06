@@ -1,6 +1,6 @@
 .vscode/
 *.o
-cyprsh
+cyprsh-linux-x86_64
 CyprSH_history
 docs/
 CyprSH-source.zip
