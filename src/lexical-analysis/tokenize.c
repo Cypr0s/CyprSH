@@ -260,10 +260,23 @@ static Token handleWord(LexerPtr lex, int32_t c) {
         }
 
         size_t word_length = lex->char_buff.size;
-        
-        char* word = charBufferTransfer(&(lex->char_buff));
 
-        int8_t* quotes = int8BufferTransfer(&(lex->int8_buff));
+        char* word = malloc(word_length + 1);
+        if(word == NULL) {
+            return errorToken(ERROR_MALLOC_FAILURE);
+        }
+        memcpy(word, lex->char_buff.buff, word_length);
+        word[word_length] = '\0';
+
+        int8_t* quotes = malloc(sizeof(int8_t) * lex->int8_buff.size);
+        if(quotes == NULL && lex->int8_buff.size > 0) {
+            free(word);
+            return errorToken(ERROR_MALLOC_FAILURE);
+        }
+        memcpy(quotes, lex->int8_buff.buff, sizeof(int8_t) * lex->int8_buff.size);
+
+        charBufferReset(&(lex->char_buff));
+        int8BufferReset(&(lex->int8_buff));
         
         if(c == '<' || c == '>') {
             for(size_t i = 0; i < word_length; i++) {

@@ -79,3 +79,46 @@ void ASTFreeTree(ASTNodePtr node) {
     free(node->children);
     ASTNodeDtor(node);
 } // ASTFreeTree
+
+
+ASTNodePtr ASTCopyTree(ASTNodePtr node) {
+    if(node == NULL) {
+        return NULL;
+    }
+
+    char* value = node->value == NULL ? NULL : strdup(node->value);
+    if(node->value != NULL && value == NULL) {
+        return NULL;
+    }
+
+    int8_t* value_types = NULL;
+    if(node->value_types != NULL) {
+        size_t value_length = strlen(node->value);
+        value_types = malloc(sizeof(int8_t) * value_length);
+        if(value_types == NULL) {
+            free(value);
+            return NULL;
+        }
+        memcpy(value_types, node->value_types, sizeof(int8_t) * value_length);
+    }
+
+    ASTNodePtr copy = ASTNodeCtor(node->type, value, value_types);
+    if(copy == NULL) {
+        free(value);
+        free(value_types);
+        return NULL;
+    }
+
+    copy->flags = node->flags;
+
+    for(int16_t i = 0; i < node->num_children; i++) {
+        ASTNodePtr child = ASTCopyTree(node->children[i]);
+        if(child == NULL || ASTaddChild(copy, child) != SUCCESS) {
+            ASTFreeTree(child);
+            ASTFreeTree(copy);
+            return NULL;
+        }
+    }
+
+    return copy;
+}

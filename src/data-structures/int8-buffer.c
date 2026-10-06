@@ -89,3 +89,12 @@ int8_t* int8BufferTransfer(Int8BufferPtr tb) {
     tb->size = 0;
     return out;
 }
+
+
+void int8BufferReset(Int8BufferPtr tb) {
+    if(tb == NULL) {
+        return;
+    }
+
+    tb->size = 0;
+}

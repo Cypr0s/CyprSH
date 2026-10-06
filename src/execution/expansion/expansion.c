@@ -18,7 +18,7 @@ static StatusEnum expandDollar(ExpanderPtr exp);
 
 static StatusEnum expandNormal(ExpanderPtr exp) {
     char c = exp->input[exp->current_input_pos];
-    int8_t type = exp->input_types[exp->current_input_pos];
+    int8_t type = exp->input_types == NULL ? QUOTE_UNQUOTED : exp->input_types[exp->current_input_pos];
     // any dollar
     if(c == '$' && (type == QUOTE_UNQUOTED || type == QUOTE_DOUBLE_QUOTED)) {
         exp->current_input_pos++;
@@ -62,7 +62,6 @@ static StatusEnum expandDollar(ExpanderPtr exp) {
             ERR_CHECK(st);
             return stackPop(&(exp->state_stack));
         }
-
         case '?': {
             // last status
             exp->current_input_pos++;
@@ -72,7 +71,6 @@ static StatusEnum expandDollar(ExpanderPtr exp) {
             ERR_CHECK(st);
             return stackPop(&(exp->state_stack));
         }
-
         case '!': {
             // last bg pid
             exp->current_input_pos++;
@@ -84,7 +82,6 @@ static StatusEnum expandDollar(ExpanderPtr exp) {
             }
             return stackPop(&(exp->state_stack));
         }
-
         case '#': {
             // arg count
             exp->current_input_pos++;
@@ -94,7 +91,6 @@ static StatusEnum expandDollar(ExpanderPtr exp) {
             ERR_CHECK(st);
             return stackPop(&(exp->state_stack));
         }
-
         case '@':
         case '*': {
             // all args
@@ -110,7 +106,6 @@ static StatusEnum expandDollar(ExpanderPtr exp) {
             }
             return stackPop(&(exp->state_stack));
         }
-
         case '(': {
             // replace DOLLAR with ARITHMETIC/COMMAND_SUB
             exp->current_input_pos++;
@@ -123,12 +118,9 @@ static StatusEnum expandDollar(ExpanderPtr exp) {
             ) {
                 exp->current_input_pos++;
                 return stackPush(&(exp->state_stack), EXP_ARITHMETIC);
-
             }
-
             return stackPush(&(exp->state_stack), EXP_COMMAND_SUB);
         }
-
         default:
             break;
     }
@@ -156,11 +148,22 @@ static StatusEnum expandDollar(ExpanderPtr exp) {
 
     // $VAR
     charBufferReset(&(exp->name));
+
+    int8_t variable_type = exp->input_types == NULL
+        ? QUOTE_UNQUOTED
+        : exp->input_types[exp->current_input_pos];
+
     while(exp->current_input_pos < exp->input_length) {
         c = exp->input[exp->current_input_pos];
-        if(!isalnum((unsigned char)c) && c != '_') {
+
+        int8_t type = exp->input_types == NULL
+            ? QUOTE_UNQUOTED
+            : exp->input_types[exp->current_input_pos];
+
+        if(type != variable_type || (!isalnum((unsigned char)c) && c != '_')) {
             break;
         }
+
         StatusEnum st = charBufferAppendChar(&(exp->name), c);
         ERR_CHECK(st);
         exp->current_input_pos++;
@@ -178,13 +181,29 @@ static StatusEnum expandDollar(ExpanderPtr exp) {
 }
 
 
+static StatusEnum expandArithmetic(ExpanderPtr exp) {
+    while(exp->current_input_pos + 1 < exp->input_length) {
+        if(exp->input[exp->current_input_pos] == ')' &&
+           exp->input[exp->current_input_pos + 1] == ')') {
+            exp->current_input_pos += 2;
+            return stackPop(&(exp->state_stack));
+        }
+        exp->current_input_pos++;
+    }
+
+    return ERROR_EXPANSION_FAILURE;
+}
+
+
 StatusEnum expandWord(ExecuteEnvironmentPtr env, const char* input, const int8_t* input_types, char** output) {
     Expander exp;
     int8_t state_val;
     StatusEnum st = expanderCtor(&exp, env, input, input_types);
     ERR_CHECK(st);
 
-    while(exp.current_input_pos < exp.input_length) {
+    while(exp.current_input_pos < exp.input_length ||
+        (stackTop(&(exp.state_stack), &state_val) == SUCCESS && state_val != EXP_NORMAL)
+    ) {
         st = stackTop(&(exp.state_stack), &state_val);
 
         if(st != SUCCESS) {

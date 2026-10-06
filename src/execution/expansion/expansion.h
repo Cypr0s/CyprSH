@@ -13,6 +13,7 @@
 
 #include "error.h"
 #include "data-structures/expander.h"
+#include "execution/expansion/command.h"
 #include "execution/expansion/parameter.h"
 #include "execution/expansion/tilde.h"
 #include "execution/execute-type.h"

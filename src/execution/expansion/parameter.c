@@ -1,13 +1,15 @@
 #include "execution/expansion/parameter.h"
 
+extern StatusEnum expandWord(ExecuteEnvironmentPtr env, const char* input, const int8_t* input_types, char** output);
+
 static uint8_t isEscapedOrQuoted(const char c);
 static int8_t skipNestedOrQuoted(ExpanderPtr exp, size_t* i);
-static StatusEnum parseBraceExpansion(ExpanderPtr exp);
+static StatusEnum parseBraceExpansion(ExpanderPtr exp, ParameterExpansionStatePtr brace_exp);
 static StatusEnum findBraceType(ExpanderPtr exp, ParameterExpansionStatePtr brace_exp);
 static StatusEnum evalBraceExpansion(ExpanderPtr exp, ParameterExpansionStatePtr brace_exp);
 
 
-static uint8_t isEscapedOrQouted(const char c) {
+static uint8_t isEscapedOrQuoted(const char c) {
     return c == QUOTE_SINGLE_QUOTED || c == QUOTE_DOUBLE_QUOTED || c == QUOTE_ESCAPED;
 }
 
@@ -54,7 +56,7 @@ static int8_t isAssignableName(const char* name, size_t len) {
 static int8_t skipNestedOrQuoted(ExpanderPtr exp, size_t* i) {
     char c = exp->input[*i];
 
-    if (isEscapedOrQouted(c)) {
+    if (isEscapedOrQuoted(c)) {
         (*i)++;
         return 1;
     }
@@ -66,7 +68,7 @@ static int8_t skipNestedOrQuoted(ExpanderPtr exp, size_t* i) {
             size_t j = *i + 2;
             int depth = 1;
             while (j < exp->input_length && depth > 0) {
-                if (isEscapedOrQouted(exp->input[j])) { j++; continue; }
+                if (isEscapedOrQuoted(exp->input[j])) { j++; continue; }
                 if (exp->input[j] == open) depth++;
                 else if (exp->input[j] == close) depth--;
                 j++;
@@ -98,46 +100,70 @@ static StatusEnum parseBraceExpansion(ExpanderPtr exp, ParameterExpansionStatePt
             continue;
         }
         if(exp->input[i] == '}') { 
-            return SUCCESS;
+            break;
         }
         i++;
     }
+
+    if(i >= exp->input_length) {
+        return ERROR_EXPANSION_FAILURE;
+    }
+
     brace_exp->word_end = i;
-    return ERROR_EXPANSION_FAILURE;
+
+    StatusEnum st = charBufferAppendCharPtr(
+        &(exp->name),
+        (char*)&exp->input[brace_exp->parameter_start],
+        i - brace_exp->parameter_start
+    );
+    ERR_CHECK(st);
+
+    exp->current_input_pos = i + 1;
+
+    return SUCCESS;
 }
 
+
 static StatusEnum findBraceType(ExpanderPtr exp, ParameterExpansionStatePtr brace_exp) {
-    if(exp->input[brace_exp->parameter_start] == '#' && brace_exp->parameter_end - brace_exp->parameter_start >= 2) {
-        size_t i = brace_exp->parameter_start + 1;
-        if(isNameStart(exp->input[brace_exp->parameter_start])) {
+    brace_exp->parameter_start = 0;
+    brace_exp->parameter_end = 0;
+    brace_exp->word_start = 0;
+    brace_exp->word_end = exp->name.size;
+    brace_exp->has_colon = 0;
+    brace_exp->has_word = 0;
+
+    if(exp->name.size == 0) {
+        return ERROR_EXPANSION_FAILURE;
+    }
+
+    if(exp->name.buff[0] == '#' && exp->name.size >= 2) {
+        size_t i = 1;
+        if(isNameStart((unsigned char)exp->name.buff[i])) {
             i++;
-            while(i < brace_exp->parameter_end && isNameChar(exp->input[i])) i++;
-            if(i == brace_exp->parameter_end) {
+            while(i < exp->name.size && isNameChar((unsigned char)exp->name.buff[i])) i++;
+            if(i == exp->name.size) {
                 brace_exp->op = EXPAND_LENGTH;
-                brace_exp->parameter_start += 1;
+                brace_exp->parameter_start = 1;
+                brace_exp->parameter_end = i;
                 return SUCCESS;
             }
-        } else if(exp->name.size == 2) {
-            brace_exp->op = EXPAND_LENGTH;
-            brace_exp->parameter_start += 1;
-            return SUCCESS;
         }
     }
 
     size_t i = 0;
-    if(isNameStart(exp->name.buff[i])) {
+    if(isNameStart((unsigned char)exp->name.buff[i])) {
         i++;
-        while(i < brace_exp->parameter_end && isNameChar(exp->name.buff[i])) i++;
-    } else if (i < exp->name.size){
+        while(i < exp->name.size && isNameChar((unsigned char)exp->name.buff[i])) i++;
+    } else if(i < exp->name.size){
         i++;
-    }
-
-    if(i == brace_exp->parameter_end) {
-        brace_exp->op = EXPAND_PLAIN;
-        return SUCCESS;
     }
 
     brace_exp->parameter_end = i;
+
+    if(i == exp->name.size) {
+        brace_exp->op = EXPAND_PLAIN;
+        return SUCCESS;
+    }
 
     if(exp->name.buff[i] == ':') {
         brace_exp->has_colon = 1;
@@ -201,14 +227,18 @@ static StatusEnum findBraceType(ExpanderPtr exp, ParameterExpansionStatePtr brac
         i++;
     }
     brace_exp->word_start = i;
+
+    if(i < exp->name.size) {
+        brace_exp->has_word = 1;
+    }
+
     return SUCCESS;
 }
 
 
-// reworking needed
 static StatusEnum evalBraceExpansion(ExpanderPtr exp, ParameterExpansionStatePtr brace_exp) {
     char* parameter = NULL;
-    const char* param_name = exp->name.buff + brace_exp->parameter_start;
+    char* param_name = exp->name.buff + brace_exp->parameter_start;
     size_t param_name_len = brace_exp->parameter_end - brace_exp->parameter_start;
 
     char saved = exp->name.buff[brace_exp->parameter_end];
@@ -225,7 +255,7 @@ static StatusEnum evalBraceExpansion(ExpanderPtr exp, ParameterExpansionStatePtr
     int8_t is_empty = is_set && parameter[0] == '\0';
     int8_t trigger = brace_exp->has_colon ? (is_set && !is_empty) : is_set;
 
-    const char* word = exp->name.buff + brace_exp->word_start;
+    char* word = exp->name.buff + brace_exp->word_start;
 
     switch(brace_exp->op) {
         case EXPAND_PLAIN: {
@@ -240,6 +270,9 @@ static StatusEnum evalBraceExpansion(ExpanderPtr exp, ParameterExpansionStatePtr
             if(is_set) {
                 char buff[32];
                 int n = snprintf(buff, sizeof(buff), "%zu", strlen(parameter));
+                if(n < 0) {
+                    return ERROR_EXPANSION_FAILURE;
+                }
                 st = charBufferAppendCharPtr(&(exp->output), buff, (size_t)n);
                 ERR_CHECK(st);
             }
@@ -256,6 +289,7 @@ static StatusEnum evalBraceExpansion(ExpanderPtr exp, ParameterExpansionStatePtr
                 ERR_CHECK(st);
     
                 st = charBufferAppendCharPtr(&(exp->output), out, strlen(out));
+                free(out);
                 ERR_CHECK(st);
             }
             break;
@@ -269,7 +303,7 @@ static StatusEnum evalBraceExpansion(ExpanderPtr exp, ParameterExpansionStatePtr
                     printError("evalBraceExpansion", "%.*s: cannot assign in this way", (int)param_name_len, param_name);
                     return ERROR_EXPANSION_FAILURE;
                 }
-                const char* value = brace_exp->has_word ? word : "";
+                char* value = brace_exp->has_word ? word : "";
                 // TODO: expand `word` (if present) + quote removal before assigning/appending
                 st = hashTableInsert(exp->env->env_table, param_name, value);
                 ERR_CHECK(st);
@@ -316,10 +350,8 @@ static StatusEnum evalBraceExpansion(ExpanderPtr exp, ParameterExpansionStatePtr
 StatusEnum expandParameter(ExpanderPtr exp) {
     ParameterExpansionState brace_exp;
     memset(&brace_exp, 0, sizeof(brace_exp));
-    brace_exp.parameter_start = exp->current_input_pos;
 
-    // copy slice
-    StatusEnum st = parseBraceExpansion(exp);
+    StatusEnum st = parseBraceExpansion(exp, &brace_exp);
     ERR_CHECK(st);
 
     st = findBraceType(exp, &brace_exp);

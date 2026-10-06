@@ -45,4 +45,6 @@ StatusEnum int8BufferAppend(Int8BufferPtr tb, int8_t value);
  */
 int8_t* int8BufferTransfer(Int8BufferPtr tb);
 
+void int8BufferReset(Int8BufferPtr tb);
+
 #endif

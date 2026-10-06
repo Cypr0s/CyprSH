@@ -102,4 +102,7 @@ StatusEnum ASTaddChild(ASTNodePtr parent, ASTNodePtr child);
  */
 void ASTFreeTree(ASTNodePtr node);
 
+
+ASTNodePtr ASTCopyTree(ASTNodePtr node);
+
 #endif // AST_H

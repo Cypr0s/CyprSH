@@ -5,7 +5,7 @@ StatusEnum expandTilde(ExpanderPtr exp) {
     // all characters until unqoted '/'
     while(exp->current_input_pos < exp->input_length) {
         if(exp->input[exp->current_input_pos]== '/' && 
-            (QuoteTypeEnum) exp->input_types[exp->current_input_pos] == QUOTE_UNQUOTED
+            (exp->input_types == NULL || (QuoteTypeEnum) exp->input_types[exp->current_input_pos] == QUOTE_UNQUOTED)
         ) {
             break;
         }

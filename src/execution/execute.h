@@ -17,9 +17,11 @@
 #include "utilities/file.h"
 #include "shell-builtin-commands/special/special-builtin-commands.h"
 #include "shell-builtin-commands/regular/regular-builtin-commands.h"
+#include "execution/expansion/expansion.h"
 #include <unistd.h>
 #include <sys/wait.h>
 #include <stdlib.h>
+#include <fnmatch.h>
 
 /** @brief Execute AST node in given environment
  *  @param node AST node to execute

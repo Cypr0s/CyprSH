@@ -14,6 +14,7 @@
 #include "data-structures/abstract-syntax-tree.h"
 #include "data-structures/hash-table.h"
 #include "data-structures/builtin-command-linked-list.h"
+#include "data-structures/function-list.h"
 #include "error.h"
 #include <stdint.h>
 #include <sys/types.h>
@@ -36,6 +37,7 @@ typedef enum {
 
 typedef struct {
     HashTablePtr env_table;
+    FunctionList function_list;
     BuiltinCommandList builtin_command_list;
     int8_t flags;
     uint8_t last_exec_status;

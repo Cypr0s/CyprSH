@@ -9,6 +9,7 @@
  */
 
 #include "execution/execute.h"
+#include "execution/expansion/expansion.h"
 
 // utilities
 
@@ -31,7 +32,7 @@ static BuiltIn findInBuiltinArray(const char* name, const BuiltinEntry* array, s
 static StatusEnum executeBuiltinCommand(BuiltIn fn, ASTNodePtr command_node, ASTNodePtr cmd_word, ExecuteEnvironmentPtr env);
 static StatusEnum executeExternalProgram(ASTNodePtr command_node, ASTNodePtr cmd_word, ExecuteEnvironmentPtr env);
 static StatusEnum handlePrefix(ASTNodePtr command_prefix, ExecuteEnvironmentPtr env);
-static StatusEnum handleSuffix(ASTNodePtr command_suffix, char** argv, int16_t* argc);
+static StatusEnum handleSuffix(ASTNodePtr command_suffix, char** argv, int16_t* argc, ExecuteEnvironmentPtr env);
 static StatusEnum handleRedirect(ASTNodePtr redirect_node);
 static void getDefaultFD(RedirectTypeEnum type, int32_t* fd);
 static char** buildEnvp(HashTablePtr env);
@@ -82,7 +83,7 @@ static StatusEnum executeBuiltinCommand(BuiltIn fn, ASTNodePtr command_node, AST
             st = handlePrefix(child, env);
             if(st != SUCCESS) break;
         } else if(child->type == NODE_CMD_SUFFIX) {
-            st = handleSuffix(child, argv, &argc);
+            st = handleSuffix(child, argv, &argc, env);
             if(st != SUCCESS) break;
         }
     }
@@ -90,6 +91,10 @@ static StatusEnum executeBuiltinCommand(BuiltIn fn, ASTNodePtr command_node, AST
 
     if(st == SUCCESS) {
         fn(argc, argv, env);
+    }
+
+    for(int16_t i = 1; i < argc; i++) {
+        free(argv[i]);
     }
 
     dup2(saved_stdin, STDIN_FILENO);
@@ -133,7 +138,7 @@ static StatusEnum executeExternalProgram(ASTNodePtr command_node, ASTNodePtr cmd
             } else if(command_node->children[i]->type == NODE_CMD_WORD) {
                 continue;
             } else if(command_node->children[i]->type == NODE_CMD_SUFFIX) {
-                st = handleSuffix(command_node->children[i], argv, &argc);
+                st = handleSuffix(command_node->children[i], argv, &argc, env);
                 if(st != SUCCESS) {
                     exit(st);
                 }
@@ -207,11 +212,16 @@ static StatusEnum handlePrefix(ASTNodePtr command_prefix, ExecuteEnvironmentPtr 
 }
 
 
-static StatusEnum handleSuffix(ASTNodePtr command_suffix, char** argv, int16_t* argc) {
+static StatusEnum handleSuffix(ASTNodePtr command_suffix, char** argv, int16_t* argc, ExecuteEnvironmentPtr env) {
     StatusEnum st = SUCCESS;
     for(int16_t i = 0; i < command_suffix->num_children; i++) {
         if(command_suffix->children[i]->type == NODE_WORD) {
-            argv[(*argc)++] = command_suffix->children[i]->value;
+            char* expanded = NULL;
+
+            st = expandWord(env, command_suffix->children[i]->value, command_suffix->children[i]->value_types, &expanded);
+            ERR_CHECK(st);
+
+            argv[(*argc)++] = expanded;
         } else if(command_suffix->children[i]->type == NODE_REDIRECT) {
             st = handleRedirect(command_suffix->children[i]);
             ERR_CHECK(st);
