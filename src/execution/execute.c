@@ -865,9 +865,13 @@ static StatusEnum executeFunctionDefinition(ASTNodePtr function_node, ExecuteEnv
 
 void executorCtor(ExecuteEnvironmentPtr env, HashTablePtr p_env) {
    env->env_table = p_env;
-   env->last_exec_status = 0;
-   env->flags = EXEC_FLAG_NONE;
-   functionListCtor(&(env->function_list));
+    env->last_exec_status = 0;
+    env->last_bg_pid = -1;
+    env->shell_pid = getpid();
+    env->arguments = NULL;
+    env->arguments_count = 0;
+    env->flags = EXEC_FLAG_NONE;
+    functionListCtor(&(env->function_list));
 }
 
 

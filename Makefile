@@ -12,7 +12,7 @@ ZIP_NAME = CyprSH-source.zip
 .PHONY: all debug release run valgrind clean fclean rebuild docs
 
 # default build
-all: $(TARGET)
+all: clean $(TARGET)
 
 $(TARGET): $(OBJ)
 	$(CC) $(OBJ) $(LDFLAGS) -o $(TARGET)
@@ -29,9 +29,6 @@ debug: rebuild
 release: CFLAGS += -O2
 release: rebuild
 
-# run
-run: all
-	./$(TARGET)
 
 # valgrind memory leak check
 valgrind: all

@@ -95,12 +95,23 @@ static StatusEnum expandDollar(ExpanderPtr exp) {
         case '*': {
             // all args
             exp->current_input_pos++;
+
+            if(exp->env->arguments == NULL) {
+                return stackPop(&(exp->state_stack));
+            }
+
             for(int16_t i = 0; i < exp->env->arguments_count; i++) {
+                char* param = exp->env->arguments[i];
+
+                if(param == NULL) {
+                    continue;
+                }
+
                 if(i > 0) {
                     StatusEnum st = charBufferAppendChar(&(exp->output), ' ');
                     ERR_CHECK(st);
                 }
-                char* param = exp->env->arguments[i];
+
                 StatusEnum st = charBufferAppendCharPtr(&(exp->output), param, strlen(param));
                 ERR_CHECK(st);
             }
@@ -130,11 +141,16 @@ static StatusEnum expandDollar(ExpanderPtr exp) {
     if(isdigit((unsigned char)c)) {
         exp->current_input_pos++;
         int index = c - '0';
-        if(index < exp->env->arguments_count) {
+
+        if(index < exp->env->arguments_count && exp->env->arguments != NULL) {
             char* param = exp->env->arguments[index];
-            StatusEnum st = charBufferAppendCharPtr(&(exp->output), param, strlen(param));
-            ERR_CHECK(st);
+
+            if(param != NULL) {
+                StatusEnum st = charBufferAppendCharPtr(&(exp->output), param, strlen(param));
+                ERR_CHECK(st);
+            }
         }
+
         // empty string
         return stackPop(&(exp->state_stack));
     }
